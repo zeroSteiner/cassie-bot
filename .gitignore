@@ -33,3 +33,14 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# Geany
+*.geany
+
+# Cassie specific files
+# Default files from the example config
+cassie_log.txt
+users.dat
+# Files that don't need version control
+aimls/*.aiml
+*.conf
