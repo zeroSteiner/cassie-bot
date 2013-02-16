@@ -1,0 +1,11 @@
+[Unit]
+Description=Cassie chat bot daemon
+After=syslog.target network.target auditd.service
+
+[Service]
+Type=forking
+ExecStart=/opt/cassie/cassie.py -c /opt/cassie/cassie.conf
+ExecStop=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
