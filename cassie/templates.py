@@ -17,5 +17,9 @@ class CassieXMPPBotModule(object):
 	def has_command(self, command):
 		return hasattr(self, 'cmd_' + command)
 
-	def get_comand_handler(self, command):
+	def get_command_handler(self, command):
 		return getattr(self, 'cmd_' + command)
+
+	@property
+	def commands(self):
+		return map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self)))

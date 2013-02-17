@@ -77,7 +77,7 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		return
 
 class CassieXMPPBot(sleekxmpp.ClientXMPP):
-	def __init__(self, jid, password, admin, users_file, aimls_path, botmaster, module_opts):
+	def __init__(self, jid, password, admin, users_file, aimls_path, botmaster, modules = {}):
 		self.__shutdown__ = False
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
 		self.register_plugin('xep_0004') # Data Forms
@@ -94,22 +94,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.add_event_handler("disconnected", self.disconnected)
 		self.add_event_handler("ibb_stream_start", self.xep_0047_handle_stream, threaded = True)
 		
-		self.bot_modules = {}
-		
-		for mod_name in module_opts.keys():
-			self.__bot_module_current__ = mod_name
-			self.bot_modules[mod_name] = {}
-			self.bot_modules[mod_name]['opts'] = module_opts.get(mod_name)
-			self.bot_modules[mod_name]['commands'] = {}
-			try:
-				init_bot = __import__('cassie.modules.' + mod_name, None, None, ['init_bot']).init_bot
-			except (ImportError, AttributeError):
-				continue
-			init_bot(self, module_opts.get(mod_name))
-		self.__bot_module_current__ = None
+		self.bot_modules = modules
+		for module in modules.itervalues():
+			module.init_bot(self)
 		
 		self.logger = logging.getLogger('cassie.bot.xmpp')
-		self.brain = CassieAimlBrain(module_opts)
+		self.brain = CassieAimlBrain(modules)
 		self.brain.verbose(False)
 		self.brain.setBotPredicate('name', 'Cassie')
 		self.brain.setBotPredicate('botmaster', botmaster)
@@ -135,14 +125,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.logger.debug('successfully dumped authorized users to file')
 		except:
 			self.logger.error('failed to dump authorized users to file on clean up')
-	
-	def add_command(self, handler, name):
-		for mod_name, module_data in self.bot_modules.items():
-			if name in module_data['commands'].keys():
-				raise Exception('can not overwrite a handler')
-		if hasattr(self, 'cmd_' + name):
-			raise Exception('can not overwrite a handler')
-		self.bot_modules[self.__bot_module_current__]['commands'][name] = handler
 	
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
@@ -243,30 +225,27 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if hasattr(self, 'cmd_' + command):
 				cmd_handler = getattr(self, 'cmd_' + command)
 			else:
-				for mod_name, module_data in self.bot_modules.items():
-					if command in module_data['commands'].keys():
-						cmd_handler = module_data['commands'][command]
+				for module in self.bot_modules.itervalues():
+					if module.has_command(command):
+						cmd_handler = module.get_command_handler(command)
 						break
-			if cmd_handler:
-				try:
-					self.sender = jid.bare
-					if hasattr(self, 'cmd_' + command):
-						response = cmd_handler(arguments)
-					else:
-						response = cmd_handler(self, arguments)
-					msg.reply(response.strip()).send()
-					return
-				except Exception as error:
-					msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
-					self.logger.error('failed to execute command: ' + command + ' for user ' + jid.bare)
-					self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error.message)
-					tb = traceback.format_exc().split(os.linesep)
-					for line in tb: self.logger.error(line)
-					self.logger.error(error.__repr__())
-					return
-			else:
+			if not cmd_handler:
 				msg.reply('Command Not Found').send()
 				return
+			try:
+				self.sender = jid.bare
+				response = cmd_handler(arguments)
+				msg.reply(response.strip()).send()
+				return
+			except Exception as error:
+				msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
+				self.logger.error('failed to execute command: ' + command + ' for user ' + jid.bare)
+				self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error.message)
+				tb = traceback.format_exc().split(os.linesep)
+				for line in tb: self.logger.error(line)
+				self.logger.error(error.__repr__())
+				return
+
 		elif msg['body'][:4] == '?OTR':
 			msg.reply('OTR Is Not Supported At This Time.').send()
 			self.logger.debug('received OTR negotiation request from user ' + jid.bare)
@@ -366,13 +345,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		return response
 				
 	def cmd_help(self, args):
-		response = 'Version: ' + __version__ + '\n\nAvailable Commands:\n'
+		response = 'Version: ' + __version__ + '\nAvailable Commands:\n'
 		commands = []
 		commands.extend(map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))))
-
-		for modname, moddata in self.bot_modules.iteritems():
-			modcmds = moddata.get('commands', {})
-			commands.extend(modcmds.keys())
+		
+		for module in self.bot_modules.itervalues():
+			commands.extend(module.commands)
 		commands.remove('help')
 		response += '\n'.join(commands)
 		return response
@@ -394,7 +372,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		response += "Number of Categories in the AIML Kernel: {:,}\n".format(self.brain.numCategories())
 		if len(self.bot_modules):
 			response += 'Loaded Modules:'
-			response += "\n    ".join(self.bot_modules.keys())
+			response += '\n    ' + "\n    ".join(self.bot_modules.keys())
 			response += '\n'
 		
 		response += '\n== Uptime Information ==\n'
@@ -525,11 +503,11 @@ class CassieSocketRequestHandler(SocketServer.BaseRequestHandler):
 			pass
 		
 class CassieTCPBot(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-	def __init__(self, bindinfo, aimls_path, botmaster, module_opts, prompt):
+	def __init__(self, bindinfo, aimls_path, botmaster, modules, prompt):
 		__shutdown__ = False
 		SocketServer.TCPServer.__init__(self, bindinfo, CassieSocketRequestHandler)
 		self.logger = logging.getLogger('cassie.bot.tcp')
-		self.brain = CassieAimlBrain(module_opts)
+		self.brain = CassieAimlBrain(modules)
 		self.brain.verbose(False)
 		self.brain.setBotPredicate('name', 'Cassie')
 		self.brain.setBotPredicate('botmaster', botmaster)

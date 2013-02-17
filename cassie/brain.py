@@ -21,7 +21,7 @@ def getSuccess(elem):
 			return e
 
 class Brain(object, aiml.Kernel):
-	def __init__(self, module_opts, *args, **kwargs):
+	def __init__(self, modules, *args, **kwargs):
 		self.__threads__ = []
 		self.__jobs__ = []
 		self.__shutdown__ = False
@@ -34,16 +34,9 @@ class Brain(object, aiml.Kernel):
 		aiml.AimlParser.AimlHandler._validationInfo101['fail'] = ( [], [], True )
 		aiml.AimlParser.AimlHandler._validationInfo101['success'] = ( [], [], True )
 		
-		self.brain_modules = {}
-		modules = module_opts.keys()
-		for mod_name in modules:
-			self.brain_modules[mod_name] = {}
-			self.brain_modules[mod_name]['opts'] = module_opts.get(mod_name)
-			try:
-				init_brain = __import__('cassie.modules.' + mod_name, None, None, ['init_brain']).init_brain
-			except (ImportError, AttributeError):
-				continue
-			init_brain(self, module_opts.get(mod_name))
+		self.modules = modules
+		for module in modules.values():
+			module.init_brain(self)
 	
 	def __del__(self):
 		self.stop()
