@@ -1,9 +1,50 @@
+import urllib2
+from urllib import urlencode
+import xml.etree.ElementTree as ET
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
 
+"""
+# Example config:
+[mod_openfire]
+host: 127.0.0.1
+port: 9091
+use_ssl: true
+secret: blahblah
+default_groups: 
+"""
+
+# http://www.igniterealtime.org/projects/openfire/plugins/userservice/readme.html
+USER_SERVICE_PATH = '/plugins/userService/userservice'
 class Module(CassieXMPPBotModule):
-	# http://www.igniterealtime.org/projects/openfire/plugins/userservice/readme.html
-	def cmd_openfire_admin_command(bot, args):
+	def get_params(self, reqtype, username):
+		params = {}
+		params['type'] = reqtype
+		params['secret'] = self.options['secret']
+		params['username'] = username
+		return params
+	
+	def process_request(self, params):
+		scheme = 'http'
+		if self.options['use_ssl']:
+			scheme += 's'
+		uri = "{scheme}://{host}:{port}{path}?{query}"
+		uri = uri.format(scheme = scheme, host = self.options['host'], port = self.options['port'], path = USER_SERVICE_PATH, query = urlencode(params))
+		
+		response = urllib2.urlopen(uri).read()
+		response = response.strip()
+		response = ET.fromstring(response)
+		
+		tag = response.tag.lower()
+		text = response.text.lower()
+		if tag == 'result' and text == 'ok':
+			return 'Command completed successfully'
+		elif tag == 'error':
+			return 'Error \'' + response.text + '\' occurred'
+		else:
+			return 'An unknown error occurred'
+	
+	def cmd_openfire(self, args):
 		parser = ArgumentParserLite('openfire', 'manager users on openfire')
 		parser.add_argument('-a', '--add', dest = 'add_user', default = None, help = 'username to add')
 		parser.add_argument('-d', '--del', dest = 'del_user', default = None, help = 'username to delete')
@@ -15,5 +56,25 @@ class Module(CassieXMPPBotModule):
 			return parser.get_last_error()
 		response = ''
 		if results['add_user']:
-			pass
-		return None
+			if not results['password']:
+				return 'Password required to add a user'
+			params = self.get_params('add', results['add_user'])
+			params['password'] = results['password']
+			if self.options['default_groups']:
+				params['groups'] = self.options['default_groups']
+		elif results['del_user']:
+			params = self.get_params('delete', results['del_user'])
+		else:
+			return 'Must select either add or delete'
+		return self.process_request(params)
+	
+	def config_parser(self, config):
+		self.options['host'] = config.get('mod_openfire', 'host')
+		self.options['port'] = config.getint('mod_openfire', 'port')
+		self.options['use_ssl'] = config.getboolean('mod_openfire', 'use_ssl')
+		self.options['secret'] = config.get('mod_openfire', 'secret')
+		if config.has_option('mod_openfire', 'default_groups'):
+			self.options['default_groups'] = config.get('mod_openfire', 'default_groups')
+		else:
+			self.options['default_groups'] = None
+		return self.options

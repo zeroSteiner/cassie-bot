@@ -28,7 +28,7 @@ def createCyclicPattern(size):
 	return pattern
 
 class Module(CassieXMPPBotModule):
-	def cmd_cyclic_pattern(bot, args):
+	def cmd_cyclic_pattern(self, args):
 		parser = ArgumentParserLite('cyclic_pattern', 'create and search a cyclic pattern')
 		parser.add_argument('-s', '--size', dest = 'size', type = int, required = True, help = 'pattern size to create')
 		parser.add_argument('-p', '--pattern', dest = 'pattern', help = 'pattern to find')
