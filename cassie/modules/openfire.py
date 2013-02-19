@@ -48,6 +48,8 @@ class Module(CassieXMPPBotModule):
 		parser = ArgumentParserLite('openfire', 'manager users on openfire')
 		parser.add_argument('-a', '--add', dest = 'add_user', default = None, help = 'username to add')
 		parser.add_argument('-d', '--del', dest = 'del_user', default = None, help = 'username to delete')
+		parser.add_argument('--enable', dest = 'enable_user', default = None, help = 'username to enable')
+		parser.add_argument('--disable', dest = 'disable_user', default = None, help = 'username to disable')
 		parser.add_argument('-p', '--pass', dest = 'password', default = None, help = 'password for the new user')
 		if not len(args):
 			return parser.format_help()
@@ -64,8 +66,12 @@ class Module(CassieXMPPBotModule):
 				params['groups'] = self.options['default_groups']
 		elif results['del_user']:
 			params = self.get_params('delete', results['del_user'])
+		elif results['enable_user']:
+			params = self.get_params('enable', results['enable_user'])
+		elif results['disable_user']:
+			params = self.get_params('disable', results['disable_user'])
 		else:
-			return 'Must select either add or delete'
+			return 'Must select either add, delete, enable or disable'
 		return self.process_request(params)
 	
 	def config_parser(self, config):
