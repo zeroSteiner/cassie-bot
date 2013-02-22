@@ -6,7 +6,7 @@ import logging
 import getpass
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser, NoOptionError
-from cassie.utils import set_proc_name
+from cassie.utils import set_proc_name, SectionConfigParser
 from cassie.bot import CassieXMPPBot, CassieXMPPBotAimlUpdater, CassieTCPBot
 
 __version__ = '0.5'
@@ -80,7 +80,7 @@ def main():
 			except Exception as err:
 				logger.error('failed to load module: ' + module_name)
 				continue
-			module_instance.config_parser(config)
+			module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
 			modules[module_name] = module_instance
 	except NoOptionError as err:
 		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'

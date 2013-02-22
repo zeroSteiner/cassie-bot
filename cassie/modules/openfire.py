@@ -75,12 +75,12 @@ class Module(CassieXMPPBotModule):
 		return self.process_request(params)
 	
 	def config_parser(self, config):
-		self.options['host'] = config.get('mod_openfire', 'host')
-		self.options['port'] = config.getint('mod_openfire', 'port')
-		self.options['use_ssl'] = config.getboolean('mod_openfire', 'use_ssl')
-		self.options['secret'] = config.get('mod_openfire', 'secret')
-		if config.has_option('mod_openfire', 'default_groups'):
-			self.options['default_groups'] = config.get('mod_openfire', 'default_groups')
+		self.options['host'] = config.get('host')
+		self.options['port'] = config.getint('port')
+		self.options['use_ssl'] = config.getboolean('use_ssl')
+		self.options['secret'] = config.get('secret')
+		if config.has_option('default_groups'):
+			self.options['default_groups'] = config.get('default_groups')
 		else:
 			self.options['default_groups'] = None
 		return self.options
