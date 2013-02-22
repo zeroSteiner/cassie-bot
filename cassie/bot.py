@@ -36,7 +36,7 @@ class CassieUserManager(dict):
 
 class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 	def __init__(self, jid, password, receiver, aiml_path):
-		jid = jid.split('/')[0] + "/botadmin"
+		jid = jid.split('/')[0] + '/botadmin'
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
 		self.register_plugin('xep_0004') # Data Forms
 		self.register_plugin('xep_0030') # Service Discovery
@@ -68,10 +68,11 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 			self.logger.info('sending ' + str(len(data)) + ' bytes of data to the receiving bot')
 			self.logger.info('SHA-1 sum of sent data: ' + hashlib.new('sha1', data).hexdigest())
 			stream.sendall(data)
-			stream.send()
+			stream.send('')
 			stream.close()
 		except:
 			self.logger.error('encountered an error while transfering the data to the receiving bot')
+			self.disconnect()
 			return
 		self.logger.info('completed sending the data to the receiving bot')
 		self.disconnect()
@@ -474,13 +475,13 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		sys.exit(1)
 	
 	def xep_0047_accept_stream(self, msg):
-		#if not msg['from'].bare in self.authorized_users:
-		#	return False
-		#user = self.authorized_users[msg['from'].bare]
-		#if user['lvl'] < ADMIN:
-		#	return False
-		#if msg['from'].resource != "/botadmin":
-		#	return False
+		if not msg['from'].bare in self.authorized_users:
+			return False
+		user = self.authorized_users[msg['from'].bare]
+		if user['lvl'] < ADMIN:
+			return False
+		if msg['from'].resource != '/botadmin':
+			return False
 		return True
 	
 	def xep_0047_handle_stream(self, stream):
