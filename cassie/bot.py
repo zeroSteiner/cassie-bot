@@ -13,6 +13,7 @@ import sleekxmpp
 import urllib2
 import traceback
 import SocketServer
+from sleekxmpp.xmlstream import ET
 from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
 
@@ -235,7 +236,17 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			try:
 				self.sender = jid.bare
 				response = cmd_handler(arguments)
-				msg.reply(response.strip()).send()
+				response = response.strip()
+				response_lines = response.split('\n')
+				span = ET.Element('span')
+				span.set('style', 'font-family: Monospace;')
+				for subline in response_lines[:-1]:
+					p = ET.SubElement(span, 'p')
+					p.text = subline
+					ET.SubElement(span, 'br')
+				p = ET.SubElement(span, 'p')
+				p.text = response_lines[-1]
+				self.send_message(msg['from'], response, mtype = msg['type'], mhtml = span)
 				return
 			except Exception as error:
 				msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
