@@ -6,6 +6,7 @@ import logging
 import getpass
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser, NoOptionError
+from cassie.utils import set_proc_name
 from cassie.bot import CassieXMPPBot, CassieXMPPBotAimlUpdater, CassieTCPBot
 
 __version__ = '0.5'
@@ -20,17 +21,6 @@ if sys.version_info < (3, 0):
 	sys.setdefaultencoding('utf8')
 else:
 	raw_input = input
-
-def setProcName(newname):
-	from ctypes import cdll, byref, create_string_buffer
-	try:
-		libc = cdll.LoadLibrary('libc.so.6')
-		buff = create_string_buffer(len(newname) + 1)
-		buff.value = newname
-		libc.prctl(15, byref(buff), 0, 0, 0)
-	except:
-		return False
-	return True
 
 def main():
 	parser = ArgumentParser(description = 'Cassie: Chat Bot For Offensive Security Testing', conflict_handler='resolve')
@@ -182,5 +172,5 @@ def main():
 	return 0
 
 if __name__ == '__main__':
-	setProcName('cassie')
+	set_proc_name('cassie')
 	main()
