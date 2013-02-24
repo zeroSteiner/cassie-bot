@@ -32,6 +32,7 @@ class Module(CassieXMPPBotModule):
 		parser = ArgumentParserLite('cyclic_pattern', 'create and search a cyclic pattern')
 		parser.add_argument('-s', '--size', dest = 'size', type = int, required = True, help = 'pattern size to create')
 		parser.add_argument('-p', '--pattern', dest = 'pattern', help = 'pattern to find')
+		parser.add_argument('--code', dest = 'code', action = 'store_true', help = 'format the pattern for code')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -45,6 +46,12 @@ class Module(CassieXMPPBotModule):
 			return 'size is too large, max is ' + str(MAX_PATTERN_SIZE)
 		pattern = createCyclicPattern(size)
 		if results['pattern'] == None:
+			if results['code']:
+				code = "# Cyclic Pattern Length: {0}\n".format(len(pattern)) 
+				code += "pattern  = \"\"\n"
+				for idx in range(0, len(pattern), 32):
+					code += "pattern += \"{0}\"\n".format(pattern[idx:idx + 32])
+				return code
 			return pattern
 		search_pattern = results['pattern']
 		if len(search_pattern) == 8:
