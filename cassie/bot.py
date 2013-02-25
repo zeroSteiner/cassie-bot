@@ -3,6 +3,7 @@ import ssl
 import sys
 import aiml
 import time
+import shlex
 import pickle
 import signal
 import hashlib
@@ -215,14 +216,20 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					return
 				if self.authorized_users[guser]['lvl'] != ADMIN:
 					return
-				command = msg['body'].split(' ', 1)[0][1:]
+				(command, arguments) = message.split(' ', 1)
+				arguments = shlex.split(arguments)
+				command = command[1:]
 				if not command.startswith(self.boundjid.user + '.'):
 					return
 				command = command[len(self.boundjid.user) + 1:]
-				arguments = message.split(' ')[1:]
 			else:
-				command = message.split(' ')[0][1:]
-				arguments = message.split(' ')[1:]
+				if ' ' in message:
+					(command, arguments) = message.split(' ', 1)
+					arguments = shlex.split(arguments)
+				else:
+					command = message
+					arguments = ''
+				command = command[1:]
 			cmd_handler = None
 			if hasattr(self, 'cmd_' + command):
 				cmd_handler = getattr(self, 'cmd_' + command)
