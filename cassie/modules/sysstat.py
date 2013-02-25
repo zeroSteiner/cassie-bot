@@ -5,10 +5,15 @@ from cassie.templates import CassieXMPPBotModule
 class Module(CassieXMPPBotModule):
 	def cmd_sysstat(self, args):
 		response = []
+		mp_lengths = map(lambda x:len(x.mountpoint), psutil.disk_partitions())
+		mp_lengths.sort()
+		longest_mount_point = mp_lengths.pop()
+		disk_format_string = "{0: <" + str(max(longest_mount_point, 8)) + "} {1}"
+		response.append('')
 		response.append('== Disk Usage ==')
 		for device in psutil.disk_partitions():
 			usage = psutil.disk_usage(device.mountpoint)
-			response.append("{0: <16} {1}".format(device.mountpoint, generate_progress_bar(usage.used, usage.total)))
+			response.append(disk_format_string.format(device.mountpoint, generate_progress_bar(usage.used, usage.total)))
 		response.append('')
 		response.append('== Memory Usage ==')
 		vmem = psutil.virtual_memory()
