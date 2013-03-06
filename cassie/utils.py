@@ -20,6 +20,7 @@ def generate_progress_bar(part, total = None, percision = 4, number_of_bars = 40
 	return progress_bar
 
 class SectionConfigParser:
+	__version__ = '0.1'
 	def __init__(self, section_name, config_parser):
 		self.section_name = section_name
 		self.config_parser = config_parser
