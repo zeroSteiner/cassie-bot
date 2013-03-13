@@ -39,6 +39,7 @@ def main():
 		settings['core_log_file'] = config.get('core', 'log_file')
 		if config.has_option('core', 'setuid'):
 			settings['core_setuid'] = config.getint('core', 'setuid')
+		pid_file = config.get('core', 'pid_file')
 		settings['core_mode'] = config.get('core', 'mode').lower()
 		settings['aiml_path'] = config.get('aiml', 'path')
 		settings['aiml_botmaster'] = config.get('aiml', 'botmaster')
@@ -59,10 +60,10 @@ def main():
 		
 	except NoOptionError as err:
 		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
-		return 78
+		return os.EX_CONFIG
 	except ValueError as err:
 		print 'Invalid Option ' + err.message + ' From Config File.'
-		return 78
+		return os.EX_CONFIG
 
 	# configure logging
 	logging.basicConfig(filename = settings['core_log_file'], level = getattr(logging, arguments.loglvl), format = "%(name)s\t %(levelname)-10s %(asctime)s %(message)s")
@@ -84,10 +85,10 @@ def main():
 			modules[module_name] = module_instance
 	except NoOptionError as err:
 		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
-		return 1
+		return os.EX_CONFIG
 	except ValueError as err:
 		print 'Invalid Option ' + err.message + ' From Config File.'
-		return 1
+		return os.EX_CONFIG
 	
 	if arguments.local or not arguments.fork:
 		console = logging.StreamHandler()
@@ -115,26 +116,38 @@ def main():
 		except EOFError:
 			pass
 		print ''
-		return 0
+		return os.EX_OK
 	
 	if arguments.update:
 		print 'Authenticating as: ' + settings['xmpp_admin']
 		try:
 			password = getpass.getpass("Password: ")
 		except KeyboardInterrupt:
-			return 0
+			return os.EX_OK
 		xmpp = CassieXMPPBotAimlUpdater(settings['xmpp_admin'], password, settings['xmpp_jid'], settings['aiml_path'])
 		logging.info('connecting to the server to initiate an AIML update')
 		if xmpp.connect((settings['xmpp_server'], settings['xmpp_port'])):
 			logging.info('transfering the AIML archive')
 			xmpp.process(block = True)
-		return 0
+		return os.EX_OK
 	
 	if arguments.fork:
+		if os.path.isfile(pid_file):
+			if not os.access(pid_file, os.W_OK):
+				logger.error('insufficient permissions to write to PID file: ' + pid_file)
+				return os.EX_NOPERM
+		elif not os.access(os.path.split(pid_file)[0], os.W_OK):
+			logger.error('insufficient permissions to write to PID file: ' + pid_file)
+			return os.EX_NOPERM
 		cpid = os.fork()
 		if cpid:
 			logger.info('forked child process with PID of: ' + str(cpid))
-			return 0
+			try:
+				pid_file_h = open(pid_file, 'w')
+				pid_file_h.write(str(cpid) + '\n')
+			except IOError:
+				logger.error('could not write to PID file: ' + pid_file)
+			return os.EX_OK
 
 	if settings['core_mode'] == 'xmpp':
 		xmpp = CassieXMPPBot(
@@ -153,7 +166,7 @@ def main():
 				os.setreuid(settings['core_setuid'], settings['core_setuid'])
 			except:
 				logger.critical('could not set the gid and uid to: ' + str(settings['core_setuid']))
-				return 0
+				return os.EX_OK
 			logger.info('successfully set the gid and uid to: ' + str(settings['core_setuid']))
 		elif os.getuid() != 0:
 			logger.error('cannot setuid when not executed as root')
@@ -169,8 +182,8 @@ def main():
 	if settings['core_mode'] == 'tcpserver':
 		tcpserver = CassieTCPBot((settings['tcpsrv_server'], settings['tcpsrv_port']), settings['aiml_path'], settings['aiml_botmaster'], modules, PROMPT)
 		tcpserver.serve_forever()
-	return 0
+	return os.EX_OK
 
 if __name__ == '__main__':
 	set_proc_name('cassie')
-	main()
+	exit(main())
