@@ -190,17 +190,17 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.logger.info('a session to the XMPP server has been established')
 	
 	def message(self, msg):
-		jid = msg['from']
 		if not len(msg['body']):
 			return
 		message = msg['body']
+		jid = msg['from']
 		if msg['type'] in ('chat', 'normal'):
 			if not jid.bare in self.authorized_users:
 				msg.reply('You Are Not Authorized To Use This Service. Registration Is Currently Closed.').send()
 				self.logger.warning('unauthorized user \'' + jid.bare + '\' sent a message')
 				return
 		elif msg['type'] == 'groupchat':
-			if msg['mucnick'] == self.boundjid.user:
+			if jid == self.boundjid.user:
 				return
 			if not self.boundjid.user.lower() in message.split(' ', 1)[0].lower():
 				return
@@ -216,12 +216,14 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					return
 				if self.authorized_users[guser]['lvl'] != ADMIN:
 					return
-				(command, arguments) = message.split(' ', 1)
-				arguments = shlex.split(arguments)
+				arguments = shlex.split(message)
+				command = arguments.pop(0)
 				command = command[1:]
 				if not command.startswith(self.boundjid.user + '.'):
 					return
-				command = command[len(self.boundjid.user) + 1:]
+				if len(command.split('.')) != 2:
+					return
+				command = command.split('.', 1)[1]
 			else:
 				if ' ' in message:
 					(command, arguments) = message.split(' ', 1)
@@ -242,7 +244,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				msg.reply('Command Not Found').send()
 				return
 			try:
-				self.sender = jid.bare
 				response = cmd_handler(arguments)
 				response = response.strip()
 				response_lines = response.split('\n')
@@ -254,7 +255,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					ET.SubElement(span, 'br')
 				p = ET.SubElement(span, 'p')
 				p.text = response_lines[-1]
-				self.send_message(msg['from'], response, mtype = msg['type'], mhtml = span)
+				self.send_message(jid.bare, response, mtype = msg['type'], mhtml = span)
 				return
 			except Exception as error:
 				msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
