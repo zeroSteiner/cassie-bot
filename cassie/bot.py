@@ -216,22 +216,15 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					return
 				if self.authorized_users[guser]['lvl'] != ADMIN:
 					return
-				arguments = shlex.split(message)
-				command = arguments.pop(0)
-				command = command[1:]
+			arguments = shlex.split(message)
+			command = arguments.pop(0)
+			command = command[1:]
+			if msg['type'] == 'groupchat':
 				if not command.startswith(self.boundjid.user + '.'):
 					return
 				if len(command.split('.')) != 2:
 					return
 				command = command.split('.', 1)[1]
-			else:
-				if ' ' in message:
-					(command, arguments) = message.split(' ', 1)
-					arguments = shlex.split(arguments)
-				else:
-					command = message
-					arguments = ''
-				command = command[1:]
 			cmd_handler = None
 			if hasattr(self, 'cmd_' + command):
 				cmd_handler = getattr(self, 'cmd_' + command)
