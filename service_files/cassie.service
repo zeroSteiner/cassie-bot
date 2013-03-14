@@ -6,8 +6,9 @@ After=syslog.target network.target auditd.service
 
 [Service]
 Type=forking
+PIDFile=/var/run/cassie.pid
 ExecStart=/opt/cassie/cassie.py -c /opt/cassie/cassie.conf
-ExecStop=/bin/kill -HUP $MAINPID
+ExecStop=/bin/kill -INT $MAINPID
 
 [Install]
 WantedBy=multi-user.target
