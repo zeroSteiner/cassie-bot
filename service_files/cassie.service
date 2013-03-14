@@ -1,3 +1,5 @@
+# Cassie daemon systemd config file
+
 [Unit]
 Description=Cassie chat bot daemon
 After=syslog.target network.target auditd.service

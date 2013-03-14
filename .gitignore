@@ -43,4 +43,4 @@ cassie_log.txt
 users.dat
 # Files that don't need version control
 aimls/*.aiml
-*.conf
+/*.conf
