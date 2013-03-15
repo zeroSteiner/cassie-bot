@@ -7,10 +7,16 @@ class JobRun(threading.Thread):
 	def __init__(self, callback, *args):
 		self.callback = callback
 		self.callback_args = args
+		self.exception = None
 		threading.Thread.__init__(self)
 
 	def run(self):
-		self.callback(*self.callback_args)
+		self.exception = None
+		try:
+			self.callback(*self.callback_args)
+		except Exception as error:
+			self.exception = error
+		return
 
 # Job Dictionary Details:
 #   last_run: datetime.datetime
