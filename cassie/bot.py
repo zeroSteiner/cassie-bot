@@ -17,6 +17,7 @@ import SocketServer
 from sleekxmpp.xmlstream import ET
 from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
+from cassie.job import JobManager
 
 __version__ = '0.5'
 
@@ -97,10 +98,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.add_event_handler("disconnected", self.disconnected)
 		self.add_event_handler("ibb_stream_start", self.xep_0047_handle_stream, threaded = True)
 		
-		self.bot_modules = modules
-		for module in modules.itervalues():
-			module.init_bot(self)
-		
 		self.logger = logging.getLogger('cassie.bot.xmpp')
 		self.brain = CassieAimlBrain(modules)
 		self.brain.verbose(False)
@@ -121,6 +118,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.records['init time'] = time.time()
 		self.logger.info('bot has been successfully initialized')
 		self.logger.info("the AIML kernel contains {:,} categories".format(self.brain.numCategories()))
+		self.job_manager = JobManager()
+		self.job_manager.start()
+		
+		self.bot_modules = modules
+		for module in modules.itervalues():
+			module.init_bot(self)
 	
 	def __del__(self):
 		try:
@@ -478,6 +481,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.disconnect()
 		if hasattr(self.brain, 'stop'):
 			self.brain.stop()
+		self.job_manager.stop()
 		sys.exit(1)
 	
 	def xep_0047_accept_stream(self, msg):

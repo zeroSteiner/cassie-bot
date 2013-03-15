@@ -24,6 +24,17 @@ class JobManager(threading.Thread):
 		self.running = True
 		threading.Thread.__init__(self)
 
+	def stop(self):
+		self.running = False
+		for job_id, job_desc in self.__jobs__.items():
+			if job_desc['job'] == None:
+				continue
+			if not job_desc['job'].is_alive():
+				continue
+			job_desc['job'].join()
+		self.join()
+		return
+
 	def run(self):
 		while self.running:
 			time.sleep(1)
