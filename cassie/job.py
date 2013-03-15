@@ -3,6 +3,16 @@ import uuid
 import datetime
 import threading
 
+__version__ = '0.1'
+__all__ = ['JobRun', 'JobManager']
+
+def normalize_job_id(job_id):
+	if isinstance(job_id, str):
+		job_id = uuid.UUID(job_id)
+	if not isinstance(job_id, uuid.UUID):
+		raise Exception('invalid job id, must be uuid.UUID instance')
+	return job_id
+
 class JobRun(threading.Thread):
 	def __init__(self, callback, *args):
 		self.callback = callback
@@ -75,18 +85,22 @@ class JobManager(threading.Thread):
 		return len(filter(lambda job_desc: job_desc['enabled'], self.__jobs__.values()))
 
 	def job_enable(self, job_id):
-		if isinstance(job_id, str):
-			job_id = uuid.UUID(job_id)
+		job_id = normalize_job_id(job_id)
 		job_desc = self.__jobs__[job_id]
 		job_desc['enabled'] = True
 
 	def job_disable(self, job_id):
-		if isinstance(job_id, str):
-			job_id = uuid.UUID(job_id)
+		job_id = normalize_job_id(job_id)
 		job_desc = self.__jobs__[job_id]
 		job_desc['enabled'] = False
 
 	def job_del(self, job_id):
-		if isinstance(job_id, str):
-			job_id = uuid.UUID(job_id)
+		job_id = normalize_job_id(job_id)
 		del self.__jobs__[job_id]
+
+	def job_exists(self, job_id):
+		job_id = normalize_job_id(job_id)
+		if job_id in self.__jobs__:
+			return True
+		else:
+			return False
