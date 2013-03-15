@@ -200,80 +200,85 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				self.logger.warning('unauthorized user \'' + jid.bare + '\' sent a message')
 				return
 		elif msg['type'] == 'groupchat':
-			if jid == self.boundjid.user:
+			if jid.resource == self.boundjid.user:
 				return
 			if not self.boundjid.user.lower() in message.split(' ', 1)[0].lower():
 				return
 		else:
 			return
-
-		# message was directed to cassie and the user is authorized
-		user = self.authorized_users[jid.bare]
-		if message[0] in ['!', '/'] and (user['lvl'] == ADMIN or msg['type'] == 'groupchat'):
-			if msg['type'] == 'groupchat':
-				guser = jid.resource + '@' + jid.server.split('.', 1)[1]
-				if not guser in self.authorized_users:
-					return
-				if self.authorized_users[guser]['lvl'] != ADMIN:
-					return
-			arguments = shlex.split(message)
-			command = arguments.pop(0)
-			command = command[1:]
-			if msg['type'] == 'groupchat':
-				if not command.startswith(self.boundjid.user + '.'):
-					return
-				if len(command.split('.')) != 2:
-					return
-				command = command.split('.', 1)[1]
-			cmd_handler = None
-			if hasattr(self, 'cmd_' + command):
-				cmd_handler = getattr(self, 'cmd_' + command)
-			else:
-				for module in self.bot_modules.itervalues():
-					if module.has_command(command):
-						cmd_handler = module.get_command_handler(command)
-						break
-			if not cmd_handler:
-				msg.reply('Command Not Found').send()
-				return
-			try:
-				response = cmd_handler(arguments)
-				response = response.strip()
-				response_lines = response.split('\n')
-				span = ET.Element('span')
-				span.set('style', 'font-family: Monospace;')
-				for subline in response_lines[:-1]:
-					p = ET.SubElement(span, 'p')
-					p.text = subline
-					ET.SubElement(span, 'br')
-				p = ET.SubElement(span, 'p')
-				p.text = response_lines[-1]
-				self.send_message(jid.bare, response, mtype = msg['type'], mhtml = span)
-				return
-			except Exception as error:
-				msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
-				self.logger.error('failed to execute command: ' + command + ' for user ' + jid.bare)
-				self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error.message)
-				tb = traceback.format_exc().split(os.linesep)
-				for line in tb: self.logger.error(line)
-				self.logger.error(error.__repr__())
-				return
-
+		if message[0] in ['!', '/']:
+			self.message_command(msg)
+			return
 		elif msg['body'][:4] == '?OTR':
 			msg.reply('OTR Is Not Supported At This Time.').send()
 			self.logger.debug('received OTR negotiation request from user ' + jid.bare)
+			return
+		message_body = msg['body'].replace('\'', '').replace('-', '')
+		self.records['message count'] += 1
+		sessionID = str(jid)
+		self.brain.setPredicate('client-name', jid.user, sessionID)
+		self.brain.setPredicate('client-name-full', str(jid), sessionID)
+		self.logger.debug('received input \'' + message_body + '\' from user: ' + jid.user)
+		response = self.brain.respond(message_body, jid.bare)
+		if response:
+			msg.reply(response).send()
 		else:
-			message_body = msg['body'].replace('\'', '').replace('-', '')
-			self.records['message count'] += 1
-			sessionID = str(jid)
-			self.brain.setPredicate('client-name', jid.user, sessionID)
-			self.brain.setPredicate('client-name-full', str(jid), sessionID)
-			self.logger.debug('received input \'' + message_body + '\' from user: ' + jid.user)
-			response = self.brain.respond(message_body, jid.bare)
-			if response:
-				msg.reply(response).send()
-			else:
-				self.records['failed message count'] += 1
+			self.records['failed message count'] += 1
+		return
+	
+	def message_command(self, msg):
+		message = msg['body']
+		jid = msg['from']
+		user = self.authorized_users[jid.bare]
+		if user['lvl'] != ADMIN:
+			if msg['type'] != 'groupchat':
+				return
+			guser = jid.resource + '@' + jid.server.split('.', 1)[1]
+			if not guser in self.authorized_users:
+				return
+			if self.authorized_users[guser]['lvl'] != ADMIN:
+				return
+		arguments = shlex.split(message)
+		command = arguments.pop(0)
+		command = command[1:]
+		if msg['type'] == 'groupchat':
+			if not command.startswith(self.boundjid.user + '.'):
+				return
+			if len(command.split('.')) != 2:
+				return
+			command = command.split('.', 1)[1]
+		cmd_handler = None
+		if hasattr(self, 'cmd_' + command):
+			cmd_handler = getattr(self, 'cmd_' + command)
+		else:
+			for module in self.bot_modules.itervalues():
+				if module.has_command(command):
+					cmd_handler = module.get_command_handler(command)
+					break
+		if not cmd_handler:
+			msg.reply('Command Not Found').send()
+			return
+		try:
+			response = cmd_handler(arguments)
+			response = response.strip()
+			response_lines = response.split('\n')
+			span = ET.Element('span')
+			span.set('style', 'font-family: Monospace;')
+			for subline in response_lines[:-1]:
+				p = ET.SubElement(span, 'p')
+				p.text = subline
+				ET.SubElement(span, 'br')
+			p = ET.SubElement(span, 'p')
+			p.text = response_lines[-1]
+			self.send_message(jid.bare, response, mtype = msg['type'], mhtml = span)
+			return
+		except Exception as error:
+			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
+			self.logger.error('failed to execute command: ' + command + ' for user ' + jid.bare)
+			self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error.message)
+			tb = traceback.format_exc().split(os.linesep)
+			for line in tb: self.logger.error(line)
+			self.logger.error(error.__repr__())
 		return
 	
 	def disconnected(self, a = None):
