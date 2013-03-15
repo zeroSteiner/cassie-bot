@@ -18,6 +18,7 @@ class JobRun(threading.Thread):
 #   job: None or JobRun instance
 #   callback: function
 #   parameters: parameter to be passed to the callback function
+#   enabled: boolean if false do not run the job
 class JobManager(threading.Thread):
 	def __init__(self):
 		self.__jobs__ = {}
@@ -43,8 +44,10 @@ class JobManager(threading.Thread):
 					continue
 				if job_desc['job'] != None and job_desc['job'].is_alive():
 					continue
+				job_desc['last_run'] = datetime.datetime.utcnow() # still update the timestamp
+				if not job_desc['enabled']:
+					continue
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
-				job_desc['last_run'] = datetime.datetime.utcnow()
 				job_desc['job'].start()
 
 	def job_add(self, callback, parameters, hours = 0, minutes = 10, seconds = 0):
@@ -54,9 +57,22 @@ class JobManager(threading.Thread):
 		job_desc['run_every'] = datetime.timedelta(0, ((hours * 60 * 60) + (minutes * 60) + seconds))
 		job_desc['callback'] = callback
 		job_desc['parameters'] = parameters
+		job_desc['enabled'] = True
 		job_id = uuid.uuid4()
 		self.__jobs__[job_id] = job_desc
 		return job_id
+
+	def job_enable(self, job_id):
+		if isinstance(job_id, str):
+			job_id = uuid.UUID(job_id)
+		job_desc = self.__jobs__[job_id]
+		job_desc['enabled'] = True
+
+	def job_disable(self, job_id):
+		if isinstance(job_id, str):
+			job_id = uuid.UUID(job_id)
+		job_desc = self.__jobs__[job_id]
+		job_desc['enabled'] = False
 
 	def job_del(self, job_id):
 		if isinstance(job_id, str):
