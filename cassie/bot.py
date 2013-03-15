@@ -391,6 +391,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		if self.records['message count'] != 0:
 			response += "Message Success Rate: {:.2f}%\n".format((float(self.records['message count'] - self.records['failed message count']) / float(self.records['message count'])) * 100)
 		response += "Number of Categories in the AIML Kernel: {:,}\n".format(self.brain.numCategories())
+		response += "Number of Jobs: Enabled: {:,} Total: {:,}\n".format(self.job_manager.job_count_enabled(), self.job_manager.job_count())
 		if len(self.bot_modules):
 			response += 'Loaded Modules:'
 			response += '\n    ' + "\n    ".join(self.bot_modules.keys())

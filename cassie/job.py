@@ -62,6 +62,12 @@ class JobManager(threading.Thread):
 		self.__jobs__[job_id] = job_desc
 		return job_id
 
+	def job_count(self):
+		return len(self.__jobs__)
+
+	def job_count_enabled(self):
+		return len(filter(lambda job_desc: job_desc['enabled'], self.__jobs__.values()))
+
 	def job_enable(self, job_id):
 		if isinstance(job_id, str):
 			job_id = uuid.UUID(job_id)
