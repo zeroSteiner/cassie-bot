@@ -36,6 +36,7 @@ class JobRun(threading.Thread):
 #   parameters: parameter to be passed to the callback function
 #   enabled: boolean if false do not run the job
 #   tolerate_exceptions: boolean if true this job will run again after a failure
+#   expiration: number of times to run a job or -1 for infinite
 class JobManager(threading.Thread):
 	def __init__(self):
 		self.__jobs__ = {}
@@ -54,15 +55,20 @@ class JobManager(threading.Thread):
 		return
 
 	def reap(self):
-		failed_jobs = []
+		jobs_for_removal = []
 		for job_id, job_desc in self.__jobs__.items():
-			if job_desc['job'].is_alive():
+			if job_desc['job'].is_alive() or job_desc['job'].reaped:
 				continue
 			if job_desc['job'].exception != None and job_desc['tolerate_exceptions'] == False:
-				failed_jobs.append(job_id)
+				jobs_for_removal.append(job_id)
+			if job_desc['expiration'] > -1:
+				if job_desc['expiration'] == 0:
+					jobs_for_removal.append(job_id)
+				else:
+					job_desc['expiration'] -= 1
 			job_desc['job'].reaped = True
-		for failed_job in failed_jobs:
-			self.job_del(failed_job)
+		for job_id in jobs_for_removal:
+			self.job_del(job_id)
 
 	def run(self):
 		while self.running:
@@ -81,7 +87,7 @@ class JobManager(threading.Thread):
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
 
-	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True):
+	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = -1):
 		job_desc = {}
 		job_desc['job'] = JobRun(callback, parameters)
 		job_desc['last_run'] = datetime.datetime.utcnow()
@@ -90,6 +96,7 @@ class JobManager(threading.Thread):
 		job_desc['parameters'] = parameters
 		job_desc['enabled'] = True
 		job_desc['tolerate_exceptions'] = tolerate_exceptions
+		job_desc['expiration'] = expiration
 		job_id = uuid.uuid4()
 		self.__jobs__[job_id] = job_desc
 		return job_id
