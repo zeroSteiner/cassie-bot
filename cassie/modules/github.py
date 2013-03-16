@@ -43,6 +43,8 @@ class Module(CassieXMPPBotModule):
 		elif results['enable'] != True and results['disable'] != True:
 			return 'please select either enable or disable'
 		job_manager = self.bot.job_manager
+		if not job_manager.job_exists(self.job_id):
+			self.job_id = job_manager.job_add(self.check_repo_activity, None, hours = 0, minutes = 0, seconds = self.check_frequency)
 		if results['enable']:
 			job_manager.job_enable(self.job_id)
 			response.append('enabled the github repository monitor')
