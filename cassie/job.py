@@ -18,10 +18,10 @@ class JobRun(threading.Thread):
 		self.callback = callback
 		self.callback_args = args
 		self.exception = None
+		self.reaped = False
 		threading.Thread.__init__(self)
 
 	def run(self):
-		self.exception = None
 		try:
 			self.callback(*self.callback_args)
 		except Exception as error:
@@ -35,6 +35,7 @@ class JobRun(threading.Thread):
 #   callback: function
 #   parameters: parameter to be passed to the callback function
 #   enabled: boolean if false do not run the job
+#   tolerate_exceptions: boolean if true this job will run again after a failure
 class JobManager(threading.Thread):
 	def __init__(self):
 		self.__jobs__ = {}
@@ -52,13 +53,27 @@ class JobManager(threading.Thread):
 		self.join()
 		return
 
+	def reap(self):
+		failed_jobs = []
+		for job_id, job_desc in self.__jobs__.items():
+			if job_desc['job'].is_alive():
+				continue
+			if job_desc['job'].exception != None and job_desc['tolerate_exceptions'] == False:
+				failed_jobs.append(job_id)
+			job_desc['job'].reaped = True
+		for failed_job in failed_jobs:
+			self.job_del(failed_job)
+
 	def run(self):
 		while self.running:
 			time.sleep(1)
+			self.reap()
 			for job_id, job_desc in self.__jobs__.items():
 				if job_desc['last_run'] + job_desc['run_every'] >= datetime.datetime.utcnow():
 					continue
-				if job_desc['job'] != None and job_desc['job'].is_alive():
+				if job_desc['job'].is_alive():
+					continue
+				if not job_desc['job'].reaped:
 					continue
 				job_desc['last_run'] = datetime.datetime.utcnow() # still update the timestamp
 				if not job_desc['enabled']:
@@ -66,14 +81,15 @@ class JobManager(threading.Thread):
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
 
-	def job_add(self, callback, parameters, hours = 0, minutes = 10, seconds = 0):
+	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True):
 		job_desc = {}
-		job_desc['job'] = None
+		job_desc['job'] = JobRun(callback, parameters)
 		job_desc['last_run'] = datetime.datetime.utcnow()
 		job_desc['run_every'] = datetime.timedelta(0, ((hours * 60 * 60) + (minutes * 60) + seconds))
 		job_desc['callback'] = callback
 		job_desc['parameters'] = parameters
 		job_desc['enabled'] = True
+		job_desc['tolerate_exceptions'] = tolerate_exceptions
 		job_id = uuid.uuid4()
 		self.__jobs__[job_id] = job_desc
 		return job_id
