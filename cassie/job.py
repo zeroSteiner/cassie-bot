@@ -41,10 +41,12 @@ class JobManager(threading.Thread):
 	def __init__(self):
 		self.__jobs__ = {}
 		self.running = True
+		self.job_lock = threading.Lock()
 		threading.Thread.__init__(self)
 
 	def stop(self):
 		self.running = False
+		self.job_lock.acquire()
 		for job_id, job_desc in self.__jobs__.items():
 			if job_desc['job'] == None:
 				continue
@@ -52,6 +54,7 @@ class JobManager(threading.Thread):
 				continue
 			job_desc['job'].join()
 		self.join()
+		self.job_lock.release()
 		return
 
 	def reap(self):
@@ -71,8 +74,13 @@ class JobManager(threading.Thread):
 			self.job_del(job_id)
 
 	def run(self):
+		self.job_lock.acquire()
 		while self.running:
+			self.job_lock.release()
 			time.sleep(1)
+			self.job_lock.acquire()
+			if not self.running:
+				break
 			self.reap()
 			for job_id, job_desc in self.__jobs__.items():
 				if job_desc['last_run'] + job_desc['run_every'] >= datetime.datetime.utcnow():
@@ -86,6 +94,7 @@ class JobManager(threading.Thread):
 					continue
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
+		self.job_lock.release()
 
 	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = -1):
 		job_desc = {}
@@ -98,7 +107,8 @@ class JobManager(threading.Thread):
 		job_desc['tolerate_exceptions'] = tolerate_exceptions
 		job_desc['expiration'] = expiration
 		job_id = uuid.uuid4()
-		self.__jobs__[job_id] = job_desc
+		with self.job_lock:
+			self.__jobs__[job_id] = job_desc
 		return job_id
 
 	def job_count(self):
@@ -109,17 +119,20 @@ class JobManager(threading.Thread):
 
 	def job_enable(self, job_id):
 		job_id = normalize_job_id(job_id)
-		job_desc = self.__jobs__[job_id]
-		job_desc['enabled'] = True
+		with self.job_lock:
+			job_desc = self.__jobs__[job_id]
+			job_desc['enabled'] = True
 
 	def job_disable(self, job_id):
 		job_id = normalize_job_id(job_id)
-		job_desc = self.__jobs__[job_id]
-		job_desc['enabled'] = False
+		with self.job_lock:
+			job_desc = self.__jobs__[job_id]
+			job_desc['enabled'] = False
 
 	def job_del(self, job_id):
 		job_id = normalize_job_id(job_id)
-		del self.__jobs__[job_id]
+		with self.job_lock:
+			del self.__jobs__[job_id]
 
 	def job_exists(self, job_id):
 		job_id = normalize_job_id(job_id)
