@@ -57,22 +57,6 @@ class JobManager(threading.Thread):
 		self.job_lock.release()
 		return
 
-	def reap(self):
-		jobs_for_removal = []
-		for job_id, job_desc in self.__jobs__.items():
-			if job_desc['job'].is_alive() or job_desc['job'].reaped:
-				continue
-			if job_desc['job'].exception != None and job_desc['tolerate_exceptions'] == False:
-				jobs_for_removal.append(job_id)
-			if job_desc['expiration'] > -1:
-				if job_desc['expiration'] == 0:
-					jobs_for_removal.append(job_id)
-				else:
-					job_desc['expiration'] -= 1
-			job_desc['job'].reaped = True
-		for job_id in jobs_for_removal:
-			self.job_del(job_id)
-
 	def run(self):
 		self.job_lock.acquire()
 		while self.running:
@@ -81,7 +65,24 @@ class JobManager(threading.Thread):
 			self.job_lock.acquire()
 			if not self.running:
 				break
-			self.reap()
+
+			# Reap Jobs
+			jobs_for_removal = []
+			for job_id, job_desc in self.__jobs__.items():
+				if job_desc['job'].is_alive() or job_desc['job'].reaped:
+					continue
+				if job_desc['job'].exception != None and job_desc['tolerate_exceptions'] == False:
+					jobs_for_removal.append(job_id)
+				if job_desc['expiration'] > -1:
+					if job_desc['expiration'] == 0:
+						jobs_for_removal.append(job_id)
+					else:
+						job_desc['expiration'] -= 1
+				job_desc['job'].reaped = True
+			for job_id in jobs_for_removal:
+				del self.__jobs__[job_id]
+
+			# Sow Jobs
 			for job_id, job_desc in self.__jobs__.items():
 				if job_desc['last_run'] + job_desc['run_every'] >= datetime.datetime.utcnow():
 					continue
