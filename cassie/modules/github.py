@@ -9,6 +9,7 @@ from cassie.templates import CassieXMPPBotModule
 [mod_github]
 repository: zeroSteiner/cassie-bot
 report_room: lobby@rooms.openfire
+check_frequency: 1200
 """
 
 class Module(CassieXMPPBotModule):
@@ -16,7 +17,7 @@ class Module(CassieXMPPBotModule):
 		CassieXMPPBotModule.__init__(self)
 		self.repositories = []
 		self.report_rooms = []
-		self.check_frequency = 600 # in seconds
+		self.check_frequency = 1200 # in seconds
 		self.job_id = None
 
 	def init_bot(self, *args, **kwargs):
@@ -26,6 +27,7 @@ class Module(CassieXMPPBotModule):
 	def config_parser(self, config):
 		self.repositories.append(config.get('repository'))
 		self.report_rooms.append(config.get('report_room'))
+		self.check_frequency = config.getint('check_frequency', 1200)
 		return self.options
 
 	def cmd_github(self, args):
