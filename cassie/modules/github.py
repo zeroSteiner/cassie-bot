@@ -17,17 +17,21 @@ class Module(CassieXMPPBotModule):
 		CassieXMPPBotModule.__init__(self)
 		self.repositories = []
 		self.report_rooms = []
-		self.check_frequency = 1200 # in seconds
+		self.reported_commits = {}
+		self.reported_commits_cache_age = datetime.timedelta(1, 0)
+		self.check_frequency = datetime.timedelta(0, 1200) # in seconds
 		self.job_id = None
+		self.job_start_time = datetime.datetime.utcnow()
 
 	def init_bot(self, *args, **kwargs):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
+		self.job_start_time = datetime.datetime.utcnow()
 		self.job_id = self.bot.job_manager.job_add(self.check_repo_activity, None, hours = 0, minutes = 0, seconds = self.check_frequency)
 
 	def config_parser(self, config):
 		self.repositories.append(config.get('repository'))
 		self.report_rooms.append(config.get('report_room'))
-		self.check_frequency = config.getint('check_frequency', 1200)
+		self.check_frequency = datetime.timedelta(0, config.getint('check_frequency', 1200))
 		return self.options
 
 	def cmd_github(self, args):
@@ -46,6 +50,7 @@ class Module(CassieXMPPBotModule):
 			return 'please select either enable or disable'
 		job_manager = self.bot.job_manager
 		if not job_manager.job_exists(self.job_id):
+			self.job_start_time = datetime.datetime.utcnow()
 			self.job_id = job_manager.job_add(self.check_repo_activity, None, hours = 0, minutes = 0, seconds = self.check_frequency)
 		if results['enable']:
 			job_manager.job_enable(self.job_id)
@@ -56,11 +61,10 @@ class Module(CassieXMPPBotModule):
 		return '\n'.join(response)
 
 	def check_repo_activity(self, *args):
-		time_span = datetime.timedelta(0, self.check_frequency)
+		now = datetime.datetime.utcnow()
 		for repository in self.repositories:
 			try:
-				since_timestamp = (datetime.datetime.utcnow() - time_span).strftime("%Y-%m-%dT%H:%M:%SZ")
-				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/commits?since=' + since_timestamp)
+				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/commits')
 				data = url_h.read()
 				commits = json.loads(data)
 				if len(commits):
@@ -71,17 +75,33 @@ class Module(CassieXMPPBotModule):
 				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls?state=open')
 				data = url_h.read()
 				pulls = json.loads(data)
-				recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + time_span >= datetime.datetime.utcnow()), pulls)
+				recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pulls)
 				if len(recent_pulls):
 					self.handle_pull_requests(repository, recent_pulls)
 			except:
 				pass
 
 	def handle_commits(self, repository, commits):
+		now = datetime.datetime.utcnow()
+		# Remove old commits from the cache
+		commit_ids_for_removal = []
+		for commit_id, commit_date in self.reported_commits.items():
+			if commit_date <= now - self.reported_commits_cache_age:
+				commit_ids_for_removal.append(commit_id)
+		for commit_id in commit_ids_for_removal:
+			del self.reported_commits[commit_id]
+
 		commits.reverse()
 		for commit in commits:
+			commit_id = commit['sha']
+			if commit_id in self.reported_commits:
+				continue
 			commit = commit['commit']
 			committer = commit['committer']['name']
+			commit_date = datetime.datetime.strptime(commit['committer']['date'], "%Y-%m-%dT%H:%M:%SZ")
+			if commit_date <= max(self.job_start_time, now - self.reported_commits_cache_age):
+				continue
+			self.reported_commits[commit_id] = commit_date
 			message = commit['message'].split('\n')[0]
 			report = "GitHub {0}: {1} pushed commit\"{2}\"".format(repository, committer, message)
 			for room in self.report_rooms:
