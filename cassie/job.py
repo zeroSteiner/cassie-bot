@@ -38,11 +38,24 @@ class JobRun(threading.Thread):
 #   tolerate_exceptions: boolean if true this job will run again after a failure
 #   expiration: number of times to run a job, datetime.timedelta instance or None
 class JobManager(threading.Thread):
-	def __init__(self):
+	def __init__(self, use_utc = True):
 		self.__jobs__ = {}
 		self.running = True
 		self.job_lock = threading.Lock()
+		self.use_utc = use_utc
 		threading.Thread.__init__(self)
+
+	def now(self):
+		if self.use_utc:
+			return datetime.datetime.utcnow()
+		else:
+			return datetime.datetime.now()
+
+	def now_is_after(self, d):
+		return bool(d <= self.now())
+
+	def now_is_before(self, d):
+		return bool(d >= self.now())
 
 	def stop(self):
 		self.running = False
@@ -79,7 +92,7 @@ class JobManager(threading.Thread):
 					else:
 						jobs_for_removal.append(job_id)
 				elif isinstance(job_desc['expiration'], datetime.datetime):
-					if job_desc['expiration'] <= datetime.datetime.utcnow():
+					if self.now_is_after(job_desc['expiration']):
 						jobs_for_removal.append(job_id)
 				job_desc['job'].reaped = True
 			for job_id in jobs_for_removal:
@@ -87,13 +100,13 @@ class JobManager(threading.Thread):
 
 			# Sow Jobs
 			for job_id, job_desc in self.__jobs__.items():
-				if job_desc['last_run'] + job_desc['run_every'] >= datetime.datetime.utcnow():
+				if self.now_is_before(job_desc['last_run'] + job_desc['run_every']):
 					continue
 				if job_desc['job'].is_alive():
 					continue
 				if not job_desc['job'].reaped:
 					continue
-				job_desc['last_run'] = datetime.datetime.utcnow() # still update the timestamp
+				job_desc['last_run'] = self.now() # still update the timestamp
 				if not job_desc['enabled']:
 					continue
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
@@ -103,7 +116,7 @@ class JobManager(threading.Thread):
 	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = None):
 		job_desc = {}
 		job_desc['job'] = JobRun(callback, parameters)
-		job_desc['last_run'] = datetime.datetime.utcnow()
+		job_desc['last_run'] = self.now()
 		job_desc['run_every'] = datetime.timedelta(0, ((hours * 60 * 60) + (minutes * 60) + seconds))
 		job_desc['callback'] = callback
 		job_desc['parameters'] = parameters
@@ -112,7 +125,7 @@ class JobManager(threading.Thread):
 		if isinstance(expiration, int):
 			job_desc['expiration'] = expiration
 		elif isinstance(expiration, datetime.timedelta):
-			job_desc['expiration'] = datetime.datetime.utcnow() + expiration
+			job_desc['expiration'] = self.now() + expiration
 		elif isinstance(expiration, datetime.datetime):
 			job_desc['expiration'] = expiration
 		else:
