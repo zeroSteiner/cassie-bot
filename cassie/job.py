@@ -36,7 +36,7 @@ class JobRun(threading.Thread):
 #   parameters: parameter to be passed to the callback function
 #   enabled: boolean if false do not run the job
 #   tolerate_exceptions: boolean if true this job will run again after a failure
-#   expiration: number of times to run a job or -1 for infinite
+#   expiration: number of times to run a job, datetime.timedelta instance or None
 class JobManager(threading.Thread):
 	def __init__(self):
 		self.__jobs__ = {}
@@ -73,11 +73,14 @@ class JobManager(threading.Thread):
 					continue
 				if job_desc['job'].exception != None and job_desc['tolerate_exceptions'] == False:
 					jobs_for_removal.append(job_id)
-				if job_desc['expiration'] > -1:
-					if job_desc['expiration'] == 0:
-						jobs_for_removal.append(job_id)
-					else:
+				if isinstance(job_desc['expiration'], int):
+					if job_desc['expiration'] > 0:
 						job_desc['expiration'] -= 1
+					else:
+						jobs_for_removal.append(job_id)
+				elif isinstance(job_desc['expiration'], datetime.datetime):
+					if job_desc['expiration'] <= datetime.datetime.utcnow():
+						jobs_for_removal.append(job_id)
 				job_desc['job'].reaped = True
 			for job_id in jobs_for_removal:
 				del self.__jobs__[job_id]
@@ -97,7 +100,7 @@ class JobManager(threading.Thread):
 				job_desc['job'].start()
 		self.job_lock.release()
 
-	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = -1):
+	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = None):
 		job_desc = {}
 		job_desc['job'] = JobRun(callback, parameters)
 		job_desc['last_run'] = datetime.datetime.utcnow()
@@ -106,7 +109,14 @@ class JobManager(threading.Thread):
 		job_desc['parameters'] = parameters
 		job_desc['enabled'] = True
 		job_desc['tolerate_exceptions'] = tolerate_exceptions
-		job_desc['expiration'] = expiration
+		if isinstance(expiration, int):
+			job_desc['expiration'] = expiration
+		elif isinstance(expiration, datetime.timedelta):
+			job_desc['expiration'] = datetime.datetime.utcnow() + expiration
+		elif isinstance(expiration, datetime.datetime):
+			job_desc['expiration'] = expiration
+		else:
+			job_desc['expiration'] = None
 		job_id = uuid.uuid4()
 		with self.job_lock:
 			self.__jobs__[job_id] = job_desc
