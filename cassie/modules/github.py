@@ -72,7 +72,7 @@ class Module(CassieXMPPBotModule):
 			except:
 				pass
 			try:
-				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls?state=open')
+				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls')
 				data = url_h.read()
 				pulls = json.loads(data)
 				recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pulls)
