@@ -36,6 +36,7 @@ class JobRun(threading.Thread):
 #   parameters: parameter to be passed to the callback function
 #   enabled: boolean if false do not run the job
 #   tolerate_exceptions: boolean if true this job will run again after a failure
+#   run_count: number of times the job has been ran
 #   expiration: number of times to run a job, datetime.timedelta instance or None
 class JobManager(threading.Thread):
 	def __init__(self, use_utc = True):
@@ -114,6 +115,7 @@ class JobManager(threading.Thread):
 				job_desc['last_run'] = self.now() # still update the timestamp
 				if not job_desc['enabled']:
 					continue
+				job_desc['run_count'] += 1
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
 		self.shutdown.set()
@@ -128,6 +130,7 @@ class JobManager(threading.Thread):
 		job_desc['parameters'] = parameters
 		job_desc['enabled'] = True
 		job_desc['tolerate_exceptions'] = tolerate_exceptions
+		job_desc['run_count'] = 0
 		if isinstance(expiration, int):
 			job_desc['expiration'] = expiration
 		elif isinstance(expiration, datetime.timedelta):
