@@ -40,7 +40,9 @@ class JobRun(threading.Thread):
 class JobManager(threading.Thread):
 	def __init__(self, use_utc = True):
 		self.__jobs__ = {}
-		self.running = True
+		self.running = threading.Event()
+		self.shutdown = threading.Event()
+		self.shutdown.set()
 		self.job_lock = threading.Lock()
 		self.use_utc = use_utc
 		threading.Thread.__init__(self)
@@ -58,7 +60,8 @@ class JobManager(threading.Thread):
 		return bool(d >= self.now())
 
 	def stop(self):
-		self.running = False
+		self.running.clear()
+		self.shutdown.wait()
 		self.job_lock.acquire()
 		for job_id, job_desc in self.__jobs__.items():
 			if job_desc['job'] == None:
@@ -72,11 +75,13 @@ class JobManager(threading.Thread):
 
 	def run(self):
 		self.job_lock.acquire()
-		while self.running:
+		self.running.set()
+		self.shutdown.clear()
+		while self.running.is_set():
 			self.job_lock.release()
 			time.sleep(1)
 			self.job_lock.acquire()
-			if not self.running:
+			if not self.running.is_set():
 				break
 
 			# Reap Jobs
@@ -111,6 +116,7 @@ class JobManager(threading.Thread):
 					continue
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
+		self.shutdown.set()
 		self.job_lock.release()
 
 	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = None):
