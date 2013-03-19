@@ -103,7 +103,7 @@ class Module(CassieXMPPBotModule):
 				continue
 			self.reported_commits[commit_id] = commit_date
 			message = commit['message'].split('\n')[0]
-			report = "GitHub {0}: {1} pushed commit\"{2}\"".format(repository, committer, message)
+			report = "GitHub {0}: {1} pushed commit\n\"{2}\"".format(repository, committer, message)
 			for room in self.report_rooms:
 				self.bot.join_chat_room(room)
 				self.bot.send_message(room, report, mtype = 'groupchat')
