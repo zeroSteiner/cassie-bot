@@ -25,6 +25,8 @@ class Brain(object, aiml.Kernel):
 		self.__threads__ = []
 		self.__jobs__ = []
 		self.__shutdown__ = False
+		if modules == None:
+			modules = {}
 		
 		aiml.Kernel.__init__(self)
 		self._elementProcessors['error'] = self._processError

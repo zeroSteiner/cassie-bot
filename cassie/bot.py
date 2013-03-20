@@ -522,11 +522,11 @@ class CassieSocketRequestHandler(SocketServer.BaseRequestHandler):
 			pass
 		
 class CassieTCPBot(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-	def __init__(self, bindinfo, aimls_path, botmaster, modules, prompt):
+	def __init__(self, bindinfo, aimls_path, botmaster, prompt):
 		__shutdown__ = False
 		SocketServer.TCPServer.__init__(self, bindinfo, CassieSocketRequestHandler)
 		self.logger = logging.getLogger('cassie.bot.tcp')
-		self.brain = CassieAimlBrain(modules)
+		self.brain = CassieAimlBrain(modules = None)
 		self.brain.verbose(False)
 		self.brain.setBotPredicate('name', 'Cassie')
 		self.brain.setBotPredicate('botmaster', botmaster)

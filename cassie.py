@@ -68,27 +68,28 @@ def main():
 	# configure logging
 	logging.basicConfig(filename = settings['core_log_file'], level = getattr(logging, arguments.loglvl), format = "%(name)s\t %(levelname)-10s %(asctime)s %(message)s")
 	logger = logging.getLogger('cassie.main')
-	
-	modules = {}
-	try:
-		module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
-		for module_name in module_sections:
-			module_name = module_name[4:]
-			logger.info('loading module: ' + module_name)
-			try:
-				module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
-				module_instance = module.Module()
-			except Exception as err:
-				logger.error('failed to load module: ' + module_name)
-				continue
-			module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
-			modules[module_name] = module_instance
-	except NoOptionError as err:
-		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
-		return os.EX_CONFIG
-	except ValueError as err:
-		print 'Invalid Option ' + err.message + ' From Config File.'
-		return os.EX_CONFIG
+
+	if settings['core_mode'] == 'xmpp':
+		modules = {}
+		try:
+			module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
+			for module_name in module_sections:
+				module_name = module_name[4:]
+				logger.info('loading module: ' + module_name)
+				try:
+					module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
+					module_instance = module.Module()
+				except Exception as err:
+					logger.error('failed to load module: ' + module_name)
+					continue
+				module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
+				modules[module_name] = module_instance
+		except NoOptionError as err:
+			print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
+			return os.EX_CONFIG
+		except ValueError as err:
+			print 'Invalid Option ' + err.message + ' From Config File.'
+			return os.EX_CONFIG
 	
 	if arguments.local or not arguments.fork:
 		console = logging.StreamHandler()
@@ -180,7 +181,8 @@ def main():
 				xmpp.join_chat_room(settings['xmpp_chat_room'])
 			xmpp.process(block = True)
 	if settings['core_mode'] == 'tcpserver':
-		tcpserver = CassieTCPBot((settings['tcpsrv_server'], settings['tcpsrv_port']), settings['aiml_path'], settings['aiml_botmaster'], modules, PROMPT)
+		server_address = (settings['tcpsrv_server'], settings['tcpsrv_port'])
+		tcpserver = CassieTCPBot(server_address, settings['aiml_path'], settings['aiml_botmaster'], PROMPT)
 		tcpserver.serve_forever()
 	return os.EX_OK
 
