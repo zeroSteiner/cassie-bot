@@ -18,8 +18,7 @@ from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
 from cassie.job import JobManager
 from cassie.imcontent import IMContentText, IMContentMarkdown
-
-__version__ = '0.5'
+from cassie import __version__
 
 GUEST = 0
 USER = 1

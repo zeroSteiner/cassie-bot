@@ -9,8 +9,8 @@ from ConfigParser import ConfigParser, NoOptionError
 from cassie.utils import set_proc_name, SectionConfigParser
 from cassie.bot.xmpp import CassieXMPPBot, CassieXMPPBotAimlUpdater
 from cassie.bot.tcp import CassieTCPBot
+from cassie import __version__
 
-__version__ = '0.5'
 PROMPT = 'cassie > '
 
 # Python versions before 3.0 do not use UTF-8 encoding
