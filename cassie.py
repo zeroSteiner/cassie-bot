@@ -7,7 +7,8 @@ import getpass
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser, NoOptionError
 from cassie.utils import set_proc_name, SectionConfigParser
-from cassie.bot import CassieXMPPBot, CassieXMPPBotAimlUpdater, CassieTCPBot
+from cassie.bot.xmpp import CassieXMPPBot, CassieXMPPBotAimlUpdater
+from cassie.bot.tcp import CassieTCPBot
 
 __version__ = '0.5'
 PROMPT = 'cassie > '
