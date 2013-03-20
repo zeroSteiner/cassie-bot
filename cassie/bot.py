@@ -18,6 +18,7 @@ from sleekxmpp.xmlstream import ET
 from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
 from cassie.job import JobManager
+from cassie.imcontent import IMContentText, IMContentMarkdown
 
 __version__ = '0.5'
 
@@ -263,17 +264,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			return
 		try:
 			response = cmd_handler(arguments)
-			response = response.strip()
-			response_lines = response.split('\n')
-			span = ET.Element('span')
-			span.set('style', 'font-family: Monospace;')
-			for subline in response_lines[:-1]:
-				p = ET.SubElement(span, 'p')
-				p.text = subline
-				ET.SubElement(span, 'br')
-			p = ET.SubElement(span, 'p')
-			p.text = response_lines[-1]
-			self.send_message(jid.bare, response, mtype = msg['type'], mhtml = span)
+			if response == None:
+				return
+			if not isinstance(response, (IMContentMarkdown, IMContentText)):
+				response = IMContentText(response)
+			response.font = 'Monospace'
+			self.send_message(jid.bare, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
 			return
 		except Exception as error:
 			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()

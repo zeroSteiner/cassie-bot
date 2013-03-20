@@ -3,6 +3,7 @@ import urllib2
 import datetime
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
+from cassie.imcontent import IMContentMarkdown
 
 """
 # Example config:
@@ -103,10 +104,8 @@ class Module(CassieXMPPBotModule):
 				continue
 			self.reported_commits[commit_id] = commit_date
 			message = commit['message'].split('\n')[0]
-			report = "GitHub {0}: {1} pushed commit\n\"{2}\"".format(repository, committer, message)
-			for room in self.report_rooms:
-				self.bot.join_chat_room(room)
-				self.bot.send_message(room, report, mtype = 'groupchat')
+			report = "GitHub {repo}: {user} [pushed commit](https://github.com/{repo}/commit/{commit_id})\n\"{msg}\"".format(repo = repository, user = committer, commit_id = commit_id, msg = message)
+			self.send_report(report)
 
 	def handle_pull_requests(self, repository, pull_rqs):
 		pull_rqs.reverse()
@@ -114,7 +113,11 @@ class Module(CassieXMPPBotModule):
 			user = pull_rq['user']['login']
 			number = pull_rq['number']
 			title = pull_rq['title']
-			report = "GitHub {0}: {1} opened pull request #{2}\n\"{3}\"".format(repository, user, number, title)
-			for room in self.report_rooms:
-				self.bot.join_chat_room(room)
-				self.bot.send_message(room, report, mtype = 'groupchat')
+			report = "GitHub {repo}: {user} [opened pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo = repository, user = user, number = number, msg = title)
+			self.send_report(report)
+
+	def send_report(self, report):
+		report = IMContentMarkdown(report, 'Monospace')
+		for room in self.report_rooms:
+			self.bot.join_chat_room(room)
+			self.bot.send_message(room, report.get_text(), mtype = 'groupchat', mhtml = report.get_xhtml())
