@@ -94,7 +94,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		# list of events: https://github.com/fritzy/SleekXMPP/wiki/Event-Index
 		self.add_event_handler("session_start", self.session_start)
 		self.add_event_handler("message", self.message)
-		self.add_event_handler("disconnected", self.disconnected)
 		self.add_event_handler("ibb_stream_start", self.xep_0047_handle_stream, threaded = True)
 		
 		self.logger = logging.getLogger('cassie.bot.xmpp')
@@ -123,13 +122,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.bot_modules = modules
 		for module in modules.itervalues():
 			module.init_bot(self)
-	
-	def __del__(self):
-		try:
-			self.authorized_users.save()
-			self.logger.debug('successfully dumped authorized users to file')
-		except:
-			self.logger.error('failed to dump authorized users to file on clean up')
 	
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
@@ -166,12 +158,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					aimls_loaded += 1
 		self.logger.info('successfully loaded ' + str(aimls_loaded) + ' AIML files into the kernel')
 		return aimls_loaded
-	
-	def connect(self, server_info = ()):
-		if len(server_info):
-			self.xmpp_server = server_info[0]
-			self.xmpp_port = server_info[1]
-		return sleekxmpp.ClientXMPP.connect(self, server_info)
 	
 	def join_chat_room(self, room, permissions = GUEST):
 		if not room in self.plugin['xep_0045'].getJoinedRooms():
@@ -277,15 +263,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			for line in tb: self.logger.error(line)
 			self.logger.error(error.__repr__())
 		return
-	
-	def disconnected(self, a = None):
-		if self.__shutdown__:
-			return
-		self.logger.warning('connection to the XMPP server has been lost, attempting to reconnect...')
-		time.sleep(10)
-		while not self.reconnect():
-			time.sleep(10)
-		self.logger.info('XMPP server reconnection successful')
 	
 	def cmd_aiml(self, args):
 		parser = ArgumentParserLite('aiml', 'control the AIML kernel')
@@ -476,6 +453,11 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.disconnect()
 		if hasattr(self.brain, 'stop'):
 			self.brain.stop()
+		try:
+			self.authorized_users.save()
+			self.logger.info('successfully dumped authorized users to file')
+		except:
+			self.logger.error('failed to dump authorized users to file on clean up')
 		self.job_manager.stop()
 		sys.exit(1)
 	
