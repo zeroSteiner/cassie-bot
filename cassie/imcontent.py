@@ -15,28 +15,11 @@ def markdown_to_html(text):
 def markdown_to_xhtml(text):
 	return markdown.markdown(text, extensions = ['nl2br'], output_format = 'xhtml1')
 
-class IMContentMarkdown:
-	def __init__(self, text, font = None):
-		self.text = normalize_text(text)
-		self.font = font
-
-	def get_text(self):
-		return self.text
-
-	def get_xhtml(self, element = True):
-		xhtml = ET.XML(markdown_to_xhtml(self.text))
-		if self.font:
-			span = ET.Element('span')
-			span.set('style', 'font-family: ' + self.font + ';')
-			span.append(xhtml)
-			xhtml = span
-		if element:
-			return xhtml
-		return ET.tostring(xhtml)
-
 class IMContentText:
-	def __init__(self, text, font = None):
+	def __init__(self, text, font = None, prepend_newline = False):
 		self.text = normalize_text(text)
+		if prepend_newline:
+			self.text = '\n' + self.text
 		self.font = font
 
 	def get_text(self):
@@ -53,6 +36,18 @@ class IMContentText:
 			ET.SubElement(xhtml, 'br')
 		p = ET.SubElement(xhtml, 'p')
 		p.text = lines[-1]
+		if element:
+			return xhtml
+		return ET.tostring(xhtml)
+
+class IMContentMarkdown(IMContentText):
+	def get_xhtml(self, element = True):
+		xhtml = ET.XML(markdown_to_xhtml(self.text))
+		if self.font:
+			span = ET.Element('span')
+			span.set('style', 'font-family: ' + self.font + ';')
+			span.append(xhtml)
+			xhtml = span
 		if element:
 			return xhtml
 		return ET.tostring(xhtml)

@@ -104,7 +104,7 @@ class Module(CassieXMPPBotModule):
 				continue
 			self.reported_commits[commit_id] = commit_date
 			message = commit['message'].split('\n')[0]
-			report = "GitHub {repo}: {user} [pushed commit](https://github.com/{repo}/commit/{commit_id})\n\"{msg}\"".format(repo = repository, user = committer, commit_id = commit_id, msg = message)
+			report = "GitHub {repo}: {user} pushed [commit](https://github.com/{repo}/commit/{commit_id})\n\"{msg}\"".format(repo = repository, user = committer, commit_id = commit_id, msg = message)
 			self.send_report(report)
 
 	def handle_pull_requests(self, repository, pull_rqs):
@@ -113,7 +113,7 @@ class Module(CassieXMPPBotModule):
 			user = pull_rq['user']['login']
 			number = pull_rq['number']
 			title = pull_rq['title']
-			report = "GitHub {repo}: {user} [opened pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo = repository, user = user, number = number, msg = title)
+			report = "GitHub {repo}: {user} opened [pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo = repository, user = user, number = number, msg = title)
 			self.send_report(report)
 
 	def send_report(self, report):
