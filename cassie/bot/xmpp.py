@@ -162,6 +162,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 	def join_chat_room(self, room, permissions = GUEST):
 		if room in self.plugin['xep_0045'].getJoinedRooms():
 			return
+		# rooms are technically authorized users
 		self.authorized_users[room] = {'lvl':permissions, 'type':'room'}
 		self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait = True)
 		self.logger.info('joined chat room: ' + room)
@@ -178,6 +179,14 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.send_presence()
 		self.get_roster()
 		self.logger.info('a session to the XMPP server has been established')
+		rooms_to_rejoin = []
+		for room_name, details in self.authorized_users.items():
+			if details['type'] != 'room':
+				continue
+			rooms_to_rejoin.append((room_name, details['lvl']))
+		for room_name, permissions in rooms_to_rejoin:
+			self.leave_chat_room(room_name)
+			self.join_chat_room(room_name, permissions)
 	
 	def message(self, msg):
 		if not len(msg['body']):
