@@ -1,6 +1,7 @@
 import json
 import urllib2
 import datetime
+import collections
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
 from cassie.imcontent import IMContentMarkdown
@@ -20,6 +21,7 @@ class Module(CassieXMPPBotModule):
 		self.report_rooms = []
 		self.reported_commits = {}
 		self.reported_commits_cache_age = datetime.timedelta(1, 0)
+		self.reported_pull_requests = collections.deque(maxlen = 10)
 		self.check_frequency = datetime.timedelta(0, 1200) # in seconds
 		self.job_id = None
 		self.job_start_time = datetime.datetime.utcnow()
@@ -76,9 +78,8 @@ class Module(CassieXMPPBotModule):
 				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls')
 				data = url_h.read()
 				pulls = json.loads(data)
-				recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pulls)
 				if len(recent_pulls):
-					self.handle_pull_requests(repository, recent_pulls)
+					self.handle_pull_requests(repository, pulls)
 			except:
 				pass
 
@@ -108,10 +109,14 @@ class Module(CassieXMPPBotModule):
 			self.send_report(report)
 
 	def handle_pull_requests(self, repository, pull_rqs):
-		pull_rqs.reverse()
-		for pull_rq in pull_rqs:
-			user = pull_rq['user']['login']
+		recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pulls_rqs)
+		recent_pulls.reverse()
+		for pull_rq in recent_pulls:
 			number = pull_rq['number']
+			if number in self.reported_pull_requests:
+				continue
+			self.reported_pull_requests.append(number)
+			user = pull_rq['user']['login']
 			title = pull_rq['title']
 			report = "GitHub {repo}: {user} opened [pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo = repository, user = user, number = number, msg = title)
 			self.send_report(report)
