@@ -473,14 +473,21 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		sys.exit(1)
 	
 	def xep_0047_accept_stream(self, msg):
-		if not msg['from'].bare in self.authorized_users:
+		try:
+			for i in range(1):
+				if not msg['from'].bare in self.authorized_users:
+					break
+				user = self.authorized_users[msg['from'].bare]
+				if user['lvl'] < ADMIN:
+					break
+				if msg['from'].resource != '/botadmin':
+					break
+				self.logger.warning('accepting an IBB stream from ' + msg['from'].bare)
+				return True
+			self.logger.warning('rejecting an IBB stream from ' + msg['from'].bare)
+		except:
+			self.logger.error('an error occured while accepting an IBB stream, it was rejected')
 			return False
-		user = self.authorized_users[msg['from'].bare]
-		if user['lvl'] < ADMIN:
-			return False
-		if msg['from'].resource != '/botadmin':
-			return False
-		return True
 	
 	def xep_0047_handle_stream(self, stream):
 		self.logger.info('stream opened: ' + stream.sid + ' from: ' + stream.receiver.bare)
