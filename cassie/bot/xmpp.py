@@ -160,16 +160,18 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		return aimls_loaded
 	
 	def join_chat_room(self, room, permissions = GUEST):
-		if not room in self.plugin['xep_0045'].getJoinedRooms():
-			self.authorized_users[room] = {'lvl':permissions, 'type':'room'}
-			self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait = True)
-			self.logger.info('joined chat room: ' + room)
+		if room in self.plugin['xep_0045'].getJoinedRooms():
+			return
+		self.authorized_users[room] = {'lvl':permissions, 'type':'room'}
+		self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait = True)
+		self.logger.info('joined chat room: ' + room)
 	
 	def leave_chat_room(self, room):
-		if room in self.plugin['xep_0045'].getJoinedRooms():
-			self.plugin['xep_0045'].leaveMUC(room, self.boundjid.use)
-			self.logger.info('left chat room: ' + room)
-			del self.authorized_users[room]
+		if not room in self.plugin['xep_0045'].getJoinedRooms():
+			return
+		self.plugin['xep_0045'].leaveMUC(room, self.boundjid.use)
+		self.logger.info('left chat room: ' + room)
+		del self.authorized_users[room]
 	
 	def session_start(self, event):
 		self.records['last connect time'] = time.time()
