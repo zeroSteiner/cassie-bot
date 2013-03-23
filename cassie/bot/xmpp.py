@@ -480,7 +480,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				user = self.authorized_users[msg['from'].bare]
 				if user['lvl'] < ADMIN:
 					break
-				if msg['from'].resource != '/botadmin':
+				if msg['from'].resource != 'botadmin':
 					break
 				self.logger.warning('accepting an IBB stream from ' + msg['from'].bare)
 				return True
