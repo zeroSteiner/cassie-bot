@@ -13,17 +13,23 @@ def normalize_job_id(job_id):
 		raise Exception('invalid job id, must be uuid.UUID instance')
 	return job_id
 
+class JobRequestDelete:
+	pass
+
 class JobRun(threading.Thread):
 	def __init__(self, callback, *args):
 		self.callback = callback
 		self.callback_args = args
+		self.request_delete = False
 		self.exception = None
 		self.reaped = False
 		threading.Thread.__init__(self)
 
 	def run(self):
 		try:
-			self.callback(*self.callback_args)
+			result = self.callback(*self.callback_args)
+			if isinstance(result, JobRequestDelete):
+				self.request_delete = True
 		except Exception as error:
 			self.exception = error
 		return
@@ -100,6 +106,8 @@ class JobManager(threading.Thread):
 				elif isinstance(job_desc['expiration'], datetime.datetime):
 					if self.now_is_after(job_desc['expiration']):
 						jobs_for_removal.append(job_id)
+				if job_desc['job'].request_delete:
+					jobs_for_removal.append(job_id)
 				job_desc['job'].reaped = True
 			for job_id in jobs_for_removal:
 				del self.__jobs__[job_id]
