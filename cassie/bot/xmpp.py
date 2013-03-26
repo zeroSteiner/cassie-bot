@@ -58,7 +58,8 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		self.logger.info('taring the AIML directory')
 		tmp_h = tempfile.TemporaryFile()
 		tar_h = tarfile.open(mode = 'w:bz2', fileobj = tmp_h)
-		tar_h.add(self.aiml_path)
+		os.chdir(self.aiml_path)
+		tar_h.add('.')
 		tar_h.close()
 		tmp_h.seek(0, 0)
 		data = tmp_h.read()
@@ -101,6 +102,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.brain.verbose(False)
 		self.brain.setBotPredicate('name', 'Cassie')
 		self.brain.setBotPredicate('botmaster', botmaster)
+		users_file = os.path.abspath(users_file)
 		if os.path.isfile(users_file):
 			self.authorized_users = CassieUserManager(pickle.load(open(users_file, 'r')), filename = users_file)
 			self.logger.info('successfully loaded ' + str(len(self.authorized_users)) + ' authorized users')
@@ -110,7 +112,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		if not admin in self.authorized_users:
 			self.authorized_users[admin] = {'lvl':ADMIN, 'type':'user'}
 		self.administrator = admin
-		self.aimls_path = aimls_path
+		self.aimls_path = os.path.abspath(aimls_path)
 		self.aiml_set_load()
 		self.records['brain init time'] = time.time()
 		self.records['init time'] = time.time()
@@ -135,18 +137,16 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		
 		number_of_updates = 0
 		all_members = tar_h.getmembers()
-		aiml_folder_members = filter(lambda x: os.path.dirname(x.name).split(os.sep)[0] == 'aimls', all_members)
-		if len(aiml_folder_members) == 0:
+		aiml_members = filter(lambda x: os.path.splitext(x.name)[-1] == '.aiml', all_members)
+		if len(aiml_members) == 0:
 			self.logger.error('no member aimls in archive')
 			tar_h.close()
 			return None
-		for cur_tar_obj in aiml_folder_members:
-			if os.path.splitext(cur_tar_obj.name)[-1] == '.aiml':
-				number_of_updates += 1
+		for cur_tar_obj in aiml_members:
 			tar_h.extract(cur_tar_obj, path = self.aimls_path)
 		
 		tar_h.close()
-		self.logger.info('successfully extracted ' + str(number_of_updates) + ' AIML files')
+		self.logger.info('successfully extracted ' + str(len(aiml_members)) + ' AIML files')
 		return number_of_updates
 	
 	def aiml_set_load(self):
