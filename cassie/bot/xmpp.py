@@ -143,7 +143,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		for cur_tar_obj in aiml_folder_members:
 			if os.path.splitext(cur_tar_obj.name)[-1] == '.aiml':
 				number_of_updates += 1
-			tar_h.extract(cur_tar_obj path = self.aimls_path)
+			tar_h.extract(cur_tar_obj, path = self.aimls_path)
 		
 		tar_h.close()
 		self.logger.info('successfully extracted ' + str(number_of_updates) + ' AIML files')
