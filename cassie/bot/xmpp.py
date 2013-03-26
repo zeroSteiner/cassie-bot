@@ -9,9 +9,9 @@ import signal
 import hashlib
 import logging
 import tarfile
+import urllib2
 import tempfile
 import sleekxmpp
-import urllib2
 import traceback
 from sleekxmpp.xmlstream import ET
 from cassie.argparselite import ArgumentParserLite
@@ -129,8 +129,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		"""
 		compression = (compression or '*')
 		tar_h = tarfile.open(mode = 'r:' + compression, fileobj = fileobj)
-		if not os.access('aimls', os.R_OK):
-			self.logger.error('invalid permissions to \'aimls\'')
+		if not os.access(self.aimls_path, os.R_OK):
+			self.logger.error('invalid permissions to \'' + self.aimls_path + '\'')
 			return None
 		
 		number_of_updates = 0
@@ -143,7 +143,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		for cur_tar_obj in aiml_folder_members:
 			if os.path.splitext(cur_tar_obj.name)[-1] == '.aiml':
 				number_of_updates += 1
-			tar_h.extract(cur_tar_obj)
+			tar_h.extract(cur_tar_obj path = self.aimls_path)
 		
 		tar_h.close()
 		self.logger.info('successfully extracted ' + str(number_of_updates) + ' AIML files')
