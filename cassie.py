@@ -92,7 +92,7 @@ def main():
 			print 'Invalid Option ' + err.message + ' From Config File.'
 			return os.EX_CONFIG
 	
-	if arguments.local or not arguments.fork:
+	if arguments.local or not arguments.fork or arguments.update:
 		console = logging.StreamHandler()
 		console.setFormatter(logging.Formatter("%(levelname)-10s: %(message)s"))
 		logging.getLogger('').addHandler(console)

@@ -12,6 +12,7 @@ import tarfile
 import urllib2
 import tempfile
 import sleekxmpp
+import threading
 import traceback
 from sleekxmpp.xmlstream import ET
 from cassie.argparselite import ArgumentParserLite
@@ -36,7 +37,7 @@ class CassieUserManager(dict):
 		pickle.dump(dict((u, ud) for u, ud in self.items() if ud['type'] == 'user'), open(self.filename, 'w'))
 
 class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
-	def __init__(self, jid, password, receiver, aiml_path):
+	def __init__(self, jid, password, target_bot, aimls_path):
 		jid = jid.split('/')[0] + '/botadmin'
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
 		self.register_plugin('xep_0004') # Data Forms
@@ -46,19 +47,21 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		self.register_plugin('xep_0199') # XMPP Ping
 		self.ssl_version = ssl.PROTOCOL_SSLv3
 		
-		self.logger = logging.getLogger('cassie.bot.xmpp.aiml_updater')
-		self.receiver = receiver
-		self.aiml_path = aiml_path
-		self.add_event_handler("session_start", self.start, threaded = True)
+		self.logger = logging.getLogger('cassie.bot.xmpp.aimls_updater')
+		self.target_bot = target_bot
+		self.aimls_path = aimls_path
+		self.aimls_reloaded = threading.Event()
+		self.add_event_handler("session_start", self.session_start, threaded = True)
+		self.add_event_handler("message", self.message, threaded = True)
 	
-	def start(self, event):
+	def session_start(self, event):
 		self.send_presence()
 		self.get_roster()
 		
 		self.logger.info('taring the AIML directory')
 		tmp_h = tempfile.TemporaryFile()
 		tar_h = tarfile.open(mode = 'w:bz2', fileobj = tmp_h)
-		os.chdir(self.aiml_path)
+		os.chdir(self.aimls_path)
 		tar_h.add('.')
 		tar_h.close()
 		tmp_h.seek(0, 0)
@@ -66,18 +69,33 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		tmp_h.close()
 		try:
 			self.logger.info('opening a stream to the receiving bot')
-			stream = self['xep_0047'].open_stream(self.receiver)
+			stream = self['xep_0047'].open_stream(self.target_bot)
 			self.logger.info('sending ' + str(len(data)) + ' bytes of data to the receiving bot')
 			self.logger.info('SHA-1 sum of sent data: ' + hashlib.new('sha1', data).hexdigest())
 			stream.sendall(data)
-			stream.send('')
 			stream.close()
 		except:
 			self.logger.error('encountered an error while transfering the data to the receiving bot')
 			self.disconnect()
 			return
 		self.logger.info('completed sending the data to the receiving bot')
+		self.send_message(self.target_bot, '!aiml --reload', mtype = 'chat')
+		if self.aimls_reloaded.wait(10.0):
+			self.logger.info('the receiving bot successfully reloaded the aiml set')
+		else:
+			self.logger.error('the receiving bot failed to reload the aiml set')
 		self.disconnect()
+		return
+
+	def message(self, msg):
+		if not msg['type'] in ('chat', 'normal'):
+			return
+		if not msg['from'] == self.target_bot:
+			return
+		message = msg['body'].lower()
+		self.logger.debug('received message: ' + msg['body'])
+		if message.startswith('success'):
+			self.aimls_reloaded.set()
 		return
 
 class CassieXMPPBot(sleekxmpp.ClientXMPP):
@@ -264,7 +282,10 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if not isinstance(response, (IMContentMarkdown, IMContentText)):
 				response = IMContentText(response)
 			response.font = 'Monospace'
-			self.send_message(jid.bare, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
+			if msg['type'] == 'groupchat':
+				self.send_message(jid.bare, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
+			else:
+				self.send_message(jid, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
 			return
 		except Exception as error:
 			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
