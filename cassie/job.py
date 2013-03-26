@@ -81,9 +81,9 @@ class JobManager(threading.Thread):
 		return
 
 	def run(self):
-		self.job_lock.acquire()
 		self.running.set()
 		self.shutdown.clear()
+		self.job_lock.acquire()
 		while self.running.is_set():
 			self.job_lock.release()
 			time.sleep(1)
@@ -126,8 +126,8 @@ class JobManager(threading.Thread):
 				job_desc['run_count'] += 1
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
-		self.shutdown.set()
 		self.job_lock.release()
+		self.shutdown.set()
 
 	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = None):
 		job_desc = {}
