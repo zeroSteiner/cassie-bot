@@ -79,7 +79,7 @@ class Module(CassieXMPPBotModule):
 				if len(commits):
 					self.handle_commits(repository, commits)
 			except:
-				pass
+				self.logger.error('an error occurred while processing commits')
 			try:
 				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls')
 				data = url_h.read()
@@ -87,7 +87,7 @@ class Module(CassieXMPPBotModule):
 				if len(recent_pulls):
 					self.handle_pull_requests(repository, pulls)
 			except:
-				pass
+				self.logger.error('an error occurred while processing pull requests')
 
 	def handle_commits(self, repository, commits):
 		now = datetime.datetime.utcnow()
