@@ -1,3 +1,4 @@
+import logging
 
 class CassieXMPPBotModule(object):
 	def __init__(self):
@@ -23,3 +24,8 @@ class CassieXMPPBotModule(object):
 	@property
 	def commands(self):
 		return map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self)))
+
+	@property
+	def logger(self):
+		module_name = self.__module__.split('.')[-1]
+		return logging.getLogger('cassie.bot.xmpp.modules.' + module_name)
