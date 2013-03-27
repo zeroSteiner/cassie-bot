@@ -1,5 +1,6 @@
 import time
 import uuid
+import logging
 import datetime
 import threading
 
@@ -45,7 +46,7 @@ class JobRun(threading.Thread):
 #   run_count: number of times the job has been ran
 #   expiration: number of times to run a job, datetime.timedelta instance or None
 class JobManager(threading.Thread):
-	def __init__(self, use_utc = True):
+	def __init__(self, use_utc = True, logger_name = 'job_manager'):
 		self.__jobs__ = {}
 		self.running = threading.Event()
 		self.shutdown = threading.Event()
@@ -53,6 +54,7 @@ class JobManager(threading.Thread):
 		self.job_lock = threading.Lock()
 		self.use_utc = use_utc
 		threading.Thread.__init__(self)
+		self.logger = logging.getLogger(logger_name)
 
 	def now(self):
 		if self.use_utc:
@@ -67,9 +69,11 @@ class JobManager(threading.Thread):
 		return bool(d >= self.now())
 
 	def stop(self):
+		self.logger.debug('stopping the job manager')
 		self.running.clear()
 		self.shutdown.wait()
 		self.job_lock.acquire()
+		self.logger.debug('waiting on all job threads')
 		for job_id, job_desc in self.__jobs__.items():
 			if job_desc['job'] == None:
 				continue
@@ -78,9 +82,11 @@ class JobManager(threading.Thread):
 			job_desc['job'].join()
 		self.join()
 		self.job_lock.release()
+		self.logger.info('the job manager has been stopped')
 		return
 
 	def run(self):
+		self.logger.info('the job manager has been started')
 		self.running.set()
 		self.shutdown.clear()
 		self.job_lock.acquire()
@@ -96,8 +102,12 @@ class JobManager(threading.Thread):
 			for job_id, job_desc in self.__jobs__.items():
 				if job_desc['job'].is_alive() or job_desc['job'].reaped:
 					continue
-				if job_desc['job'].exception != None and job_desc['tolerate_exceptions'] == False:
-					jobs_for_removal.append(job_id)
+				if job_desc['job'].exception != None:
+					if job_desc['tolerate_exceptions'] == False:
+						self.logger.error('job ' + str(job_id) + ' encountered an error and is not set to tolerate exceptions')
+						jobs_for_removal.append(job_id)
+					else:
+						self.logger.warning('job ' + str(job_id) + ' encountered an error')
 				if isinstance(job_desc['expiration'], int):
 					if job_desc['expiration'] > 0:
 						job_desc['expiration'] -= 1
@@ -150,6 +160,7 @@ class JobManager(threading.Thread):
 		job_id = uuid.uuid4()
 		with self.job_lock:
 			self.__jobs__[job_id] = job_desc
+		self.logger.info('added a new job with id: ' + str(job_id))
 		return job_id
 
 	def job_count(self):

@@ -136,7 +136,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.records['init time'] = time.time()
 		self.logger.info('bot has been successfully initialized')
 		self.logger.info("the AIML kernel contains {:,} categories".format(self.brain.numCategories()))
-		self.job_manager = JobManager()
+		self.job_manager = JobManager(logger_name = 'cassie.bot.xmpp.job_manager')
 		self.job_manager.start()
 		
 		self.bot_modules = modules
