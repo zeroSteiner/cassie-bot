@@ -64,7 +64,6 @@ class Module(CassieXMPPBotModule):
 		return '\n'.join(response)
 
 	def check_repo_activity(self, *args):
-		now = datetime.datetime.utcnow()
 		for repository in self.repositories:
 			try:
 				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/commits')
@@ -109,7 +108,8 @@ class Module(CassieXMPPBotModule):
 			self.send_report(report)
 
 	def handle_pull_requests(self, repository, pull_rqs):
-		recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pulls_rqs)
+		now = datetime.datetime.utcnow()
+		recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pull_rqs)
 		recent_pulls.reverse()
 		for pull_rq in recent_pulls:
 			number = pull_rq['number']
