@@ -14,6 +14,13 @@ report_room: lobby@rooms.openfire
 check_frequency: 1200
 """
 
+def github_repo_exists(repository):
+	try:
+		url_h = urllib2.urlopen('https://api.github.com/repos/' + repository)
+	except urllib2.HTTPError:
+		return False
+	return True
+
 class Module(CassieXMPPBotModule):
 	def __init__(self):
 		CassieXMPPBotModule.__init__(self)
