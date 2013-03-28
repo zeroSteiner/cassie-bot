@@ -36,7 +36,7 @@ class Module(CassieXMPPBotModule):
 	def init_bot(self, *args, **kwargs):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.job_start_time = datetime.datetime.utcnow()
-		self.job_id = self.bot.job_manager.job_add(self.check_repo_activity, None, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
+		self.job_id = self.bot.job_manager.job_add(self.check_repo_activity, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
 
 	def config_parser(self, config):
 		self.repositories.append(config.get('repository'))
@@ -61,7 +61,7 @@ class Module(CassieXMPPBotModule):
 		job_manager = self.bot.job_manager
 		if not job_manager.job_exists(self.job_id):
 			self.job_start_time = datetime.datetime.utcnow()
-			self.job_id = job_manager.job_add(self.check_repo_activity, None, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
+			self.job_id = job_manager.job_add(self.check_repo_activity, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
 		if results['enable']:
 			job_manager.job_enable(self.job_id)
 			response.append('enabled the github repository monitor')

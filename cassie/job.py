@@ -18,7 +18,7 @@ class JobRequestDelete:
 	pass
 
 class JobRun(threading.Thread):
-	def __init__(self, callback, *args):
+	def __init__(self, callback, args):
 		self.callback = callback
 		self.callback_args = args
 		self.request_delete = False
@@ -40,7 +40,7 @@ class JobRun(threading.Thread):
 #   run_every: datetime.timedelta
 #   job: None or JobRun instance
 #   callback: function
-#   parameters: parameter to be passed to the callback function
+#   parameters: list of parameters to be passed to the callback function
 #   enabled: boolean if false do not run the job
 #   tolerate_exceptions: boolean if true this job will run again after a failure
 #   run_count: number of times the job has been ran
@@ -139,7 +139,7 @@ class JobManager(threading.Thread):
 		self.job_lock.release()
 		self.shutdown.set()
 
-	def job_add(self, callback, parameters, hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = None):
+	def job_add(self, callback, parameters = [], hours = 0, minutes = 0, seconds = 0, tolerate_exceptions = True, expiration = None):
 		job_desc = {}
 		job_desc['job'] = JobRun(callback, parameters)
 		job_desc['last_run'] = self.now()
