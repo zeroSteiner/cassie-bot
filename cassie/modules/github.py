@@ -84,7 +84,7 @@ class Module(CassieXMPPBotModule):
 				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls')
 				data = url_h.read()
 				pulls = json.loads(data)
-				if len(recent_pulls):
+				if len(pulls):
 					self.handle_pull_requests(repository, pulls)
 			except:
 				self.logger.error('an error occurred while processing pull requests')
