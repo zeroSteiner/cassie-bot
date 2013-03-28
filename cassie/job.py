@@ -51,7 +51,7 @@ class JobManager(threading.Thread):
 		self.running = threading.Event()
 		self.shutdown = threading.Event()
 		self.shutdown.set()
-		self.job_lock = threading.Lock()
+		self.job_lock = threading.RLock()
 		self.use_utc = use_utc
 		threading.Thread.__init__(self)
 		self.logger = logging.getLogger(logger_name)
@@ -120,7 +120,7 @@ class JobManager(threading.Thread):
 					jobs_for_removal.append(job_id)
 				job_desc['job'].reaped = True
 			for job_id in jobs_for_removal:
-				del self.__jobs__[job_id]
+				self.job_del(job_id)
 
 			# Sow Jobs
 			for job_id, job_desc in self.__jobs__.items():
@@ -183,6 +183,7 @@ class JobManager(threading.Thread):
 
 	def job_del(self, job_id):
 		job_id = normalize_job_id(job_id)
+		self.logger.info('deleting job with id: ' + str(job_id))
 		with self.job_lock:
 			del self.__jobs__[job_id]
 
