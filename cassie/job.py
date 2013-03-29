@@ -8,7 +8,7 @@ __version__ = '0.1'
 __all__ = ['JobRun', 'JobManager']
 
 def normalize_job_id(job_id):
-	if isinstance(job_id, str):
+	if isinstance(job_id, (str, long)):
 		job_id = uuid.UUID(job_id)
 	if not isinstance(job_id, uuid.UUID):
 		raise Exception('invalid job id, must be uuid.UUID instance')
@@ -134,6 +134,7 @@ class JobManager(threading.Thread):
 				if not job_desc['enabled']:
 					continue
 				job_desc['run_count'] += 1
+				self.logger.debug('executing job with id: ' + str(job_id) + ' and callback function: ' + job_desc['callback'].__name__)
 				job_desc['job'] = JobRun(job_desc['callback'], job_desc['parameters'])
 				job_desc['job'].start()
 		self.job_lock.release()
@@ -158,9 +159,9 @@ class JobManager(threading.Thread):
 		else:
 			job_desc['expiration'] = None
 		job_id = uuid.uuid4()
+		self.logger.info('adding new job with id: ' + str(job_id) + ' and callback function: ' + callback.__name__)
 		with self.job_lock:
 			self.__jobs__[job_id] = job_desc
-		self.logger.info('added a new job with id: ' + str(job_id))
 		return job_id
 
 	def job_count(self):
@@ -183,7 +184,7 @@ class JobManager(threading.Thread):
 
 	def job_del(self, job_id):
 		job_id = normalize_job_id(job_id)
-		self.logger.info('deleting job with id: ' + str(job_id))
+		self.logger.info('deleting job with id: ' + str(job_id) + ' and callback function: ' + self.__jobs__[job_id]['callback'].__name__)
 		with self.job_lock:
 			del self.__jobs__[job_id]
 
