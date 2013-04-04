@@ -276,7 +276,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			msg.reply('Command Not Found').send()
 			return
 		try:
-			response = cmd_handler(arguments)
+			response = cmd_handler(arguments, jid)
 			if response == None:
 				return
 			if not isinstance(response, (IMContentMarkdown, IMContentText)):
@@ -296,7 +296,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.logger.error(error.__repr__())
 		return
 	
-	def cmd_aiml(self, args):
+	def cmd_aiml(self, args, jid):
 		parser = ArgumentParserLite('aiml', 'control the AIML kernel')
 		parser.add_argument('-u', '--update', dest = 'update', default = None, help = 'update aiml files from URL')
 		parser.add_argument('-r', '--reload', dest = 'reload', action = 'store_true', default = False, help = 'reload .aiml files')
@@ -339,7 +339,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			response += 'Successfully Reset The AIML Brain\n'
 		return response
 	
-	def cmd_bot(self, args):
+	def cmd_bot(self, args, jid):
 		parser = ArgumentParserLite('bot', 'control the bot')
 		parser.add_argument('-l', '--log', dest = 'loglvl', action = 'store', default = None, help = 'set the bots logging level')
 		parser.add_argument('--shutdown', dest = 'stop', action = 'store_true', default = False, help = 'stop the bot from running')
@@ -368,7 +368,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.request_stop()
 		return response
 				
-	def cmd_help(self, args):
+	def cmd_help(self, args, jid):
 		response = 'Version: ' + __version__ + '\nAvailable Commands:\n'
 		commands = []
 		commands.extend(map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))))
@@ -379,7 +379,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		response += '\n'.join(commands)
 		return response
 	
-	def cmd_info(self, args):
+	def cmd_info(self, args, jid):
 		MINUTE = 60
 		HOUR = 60 * MINUTE
 		DAY = 24 * HOUR
@@ -426,7 +426,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		response += "XMPP Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
 		return response[:-1]
 	
-	def cmd_user(self, args):
+	def cmd_user(self, args, jid):
 		parser = ArgumentParserLite('user', 'add/delete/modify users')
 		parser.add_argument('-a', '--add', dest = 'add user', action = 'store', default = None, help = 'add user')
 		parser.add_argument('-d', '--del', dest = 'delete user', action = 'store', default = None, help = 'delete user')
