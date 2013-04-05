@@ -10,6 +10,7 @@ import hashlib
 import logging
 import tarfile
 import urllib2
+import datetime
 import tempfile
 import sleekxmpp
 import threading
@@ -142,6 +143,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.bot_modules = modules
 		for module in modules.itervalues():
 			module.init_bot(self)
+		self.custom_message_handlers = {}
+		self.custom_message_handler_lock = threading.RLock()
 	
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
@@ -232,6 +235,22 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			msg.reply('OTR Is Not Supported At This Time.').send()
 			self.logger.debug('received OTR negotiation request from user ' + session_id)
 			return
+		
+		with self.custom_message_handler_lock:
+			if session_id in self.custom_message_handlers:
+				expiration = self.custom_message_handlers[session_id]['expiration']
+				if expiration <= datetime.datetime.utcnow():
+					del self.custom_message_handlers[session_id]
+				else:
+					custom_handler = self.custom_message_handlers[session_id]['callback']
+					try:
+						response = custom_handler(msg['body'], jid)
+					except:
+						self.logger.error(str(jid.jid) + ' encountered an error with the ' + custom_handler.__name__ + ' custom message handler')
+						response = 'the message handler encountered an error'
+					self.message_process_response(response, msg)
+					return
+		
 		message_body = msg['body'].replace('\'', '').replace('-', '')
 		self.records['message count'] += 1
 		self.brain.setPredicate('client-name', str(jid.user), session_id)
@@ -241,6 +260,19 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			msg.reply(response).send()
 		else:
 			self.records['failed message count'] += 1
+		return
+	
+	def message_process_response(self, response, msg):
+		if not response:
+			return
+		jid = msg['from']
+		if not isinstance(response, (IMContentMarkdown, IMContentText)):
+			response = IMContentText(response)
+		response.font = 'Monospace'
+		if msg['type'] == 'groupchat':
+			self.send_message(jid.bare, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
+		else:
+			self.send_message(jid, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
 		return
 	
 	def message_command(self, msg):
@@ -277,15 +309,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			return
 		try:
 			response = cmd_handler(arguments, jid)
-			if response == None:
-				return
-			if not isinstance(response, (IMContentMarkdown, IMContentText)):
-				response = IMContentText(response)
-			response.font = 'Monospace'
-			if msg['type'] == 'groupchat':
-				self.send_message(jid.bare, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
-			else:
-				self.send_message(jid, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
+			self.message_process_response(response, msg)
 			return
 		except Exception as error:
 			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
@@ -471,6 +495,25 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		except:
 			response += 'Failed To Save User Database'
 		return response
+	
+	def custom_message_handler_add(self, jid, callback, expiration):
+		jid = str(jid)
+		if isinstance(expiration, (int, float)):
+			expiration = datetime.datetime.utcnow() + datetime.timedelta(0, expiration)
+		elif isinstance(expiration, datetime.timedelta):
+			expiration = datetime.datetime.utcnow() + expiration
+		elif not isinstance(expiration, datetime.datetime):
+			raise Exception('unknown expiration format')
+		with self.custom_message_handler_lock:
+			self.logger.debug('setting custom message handler for ' + jid + ' to ' + callback.__name__)
+			self.custom_message_handlers[jid] = {'callback':callback, 'expiration':expiration}
+	
+	def custom_message_handler_del(self, jid):
+		jid = str(jid)
+		with self.custom_message_handler_lock:
+			if jid in self.custom_message_handlers:
+				del self.custom_message_handlers[jid]
+				self.logger.debug('deleting custom message handler for ' + jid)
 	
 	def request_stop(self, sig = None, other = None):
 		if sig == None:
