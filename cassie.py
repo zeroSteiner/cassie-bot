@@ -70,6 +70,11 @@ def main():
 	logging.basicConfig(filename = settings['core_log_file'], level = getattr(logging, arguments.loglvl), format = "%(name)s\t %(levelname)-10s %(asctime)s %(message)s")
 	logger = logging.getLogger('cassie.main')
 
+	if arguments.local or not arguments.fork or arguments.update:
+		console = logging.StreamHandler()
+		console.setFormatter(logging.Formatter("%(levelname)-10s: %(message)s"))
+		logging.getLogger('').addHandler(console)
+
 	if settings['core_mode'] == 'xmpp':
 		modules = {}
 		try:
@@ -81,7 +86,7 @@ def main():
 					module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
 					module_instance = module.Module()
 				except Exception as err:
-					logger.error('failed to load module: ' + module_name)
+					logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__)
 					continue
 				module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
 				modules[module_name] = module_instance
@@ -91,12 +96,7 @@ def main():
 		except ValueError as err:
 			print 'Invalid Option ' + err.message + ' From Config File.'
 			return os.EX_CONFIG
-	
-	if arguments.local or not arguments.fork or arguments.update:
-		console = logging.StreamHandler()
-		console.setFormatter(logging.Formatter("%(levelname)-10s: %(message)s"))
-		logging.getLogger('').addHandler(console)
-	
+
 	if arguments.local:
 		from cassie.brain import Brain
 		cassie = Brain(modules)
