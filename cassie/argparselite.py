@@ -1,11 +1,14 @@
 import copy
+import textwrap
+
 MAX_WIDTH = 60
 MAX_ARG_WIDTH = 24
 
 class ArgumentParserLite:
-	def __init__(self, prog = '', description = ''):
+	def __init__(self, prog = '', description = None, epilog = None):
 		self.prog = prog
-		self.description = description
+		self.description = '\n'.join(textwrap.wrap(description or ''))
+		self.epilog = '\n'.join(textwrap.wrap(epilog or ''))
 		self.__arguments__ = {}
 		self.__last_error__ = 'No Error'
 
@@ -31,6 +34,8 @@ class ArgumentParserLite:
 	def format_help(self):
 		self_arguments = copy.deepcopy(self.__arguments__)
 		help_text = self.format_usage() + '\n\n'
+		if self.description:
+			help_text += self.description + '\n\n'
 		help_text += 'arguments:\n'
 		args = self_arguments.keys()
 		args.sort()
@@ -60,6 +65,8 @@ class ArgumentParserLite:
 			help_text += arg_string
 			for arg in arg_desc['__aliases__']:
 				del self_arguments[arg]
+		if self.epilog:
+			help_text += '\n' + self.epilog
 		return help_text
 	
 	def get_last_error(self):

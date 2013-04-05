@@ -45,7 +45,7 @@ class Module(CassieXMPPBotModule):
 		return self.options
 
 	def cmd_github(self, args, jid):
-		parser = ArgumentParserLite('github', 'monitor commits to a github repository')
+		parser = ArgumentParserLite('github', 'monitor new commits and pull requests to a github repository')
 		parser.add_argument('--enable', dest = 'enable', action = 'store_true', default = None, help = 'enable this service')
 		parser.add_argument('--disable', dest = 'disable', action = 'store_true', default = None, help = 'disable this service')
 		if not len(args):
