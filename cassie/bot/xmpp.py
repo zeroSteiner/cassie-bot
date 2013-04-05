@@ -223,20 +223,20 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				return
 		else:
 			return
+
+		session_id = str(jid) # session_id as used in the AIML brain
 		if message[0] in ['!', '/']:
 			self.message_command(msg)
 			return
 		elif msg['body'][:4] == '?OTR':
 			msg.reply('OTR Is Not Supported At This Time.').send()
-			self.logger.debug('received OTR negotiation request from user ' + jid.bare)
+			self.logger.debug('received OTR negotiation request from user ' + session_id)
 			return
 		message_body = msg['body'].replace('\'', '').replace('-', '')
 		self.records['message count'] += 1
-		sessionID = str(jid)
-		self.brain.setPredicate('client-name', jid.user, sessionID)
-		self.brain.setPredicate('client-name-full', str(jid), sessionID)
-		self.logger.debug('received input \'' + message_body + '\' from user: ' + jid.user)
-		response = self.brain.respond(message_body, jid.bare)
+		self.brain.setPredicate('client-name', str(jid.user), session_id)
+		self.logger.debug('received input \'' + message_body + '\' from user: ' + session_id)
+		response = self.brain.respond(message_body, session_id)
 		if response:
 			msg.reply(response).send()
 		else:
