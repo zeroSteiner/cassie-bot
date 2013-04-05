@@ -7,8 +7,8 @@ MAX_ARG_WIDTH = 24
 class ArgumentParserLite:
 	def __init__(self, prog = '', description = None, epilog = None):
 		self.prog = prog
-		self.description = '\n'.join(textwrap.wrap(description or ''))
-		self.epilog = '\n'.join(textwrap.wrap(epilog or ''))
+		self.description = '\n'.join(textwrap.wrap((description or ''), MAX_WIDTH))
+		self.epilog = '\n'.join(textwrap.wrap((epilog or ''), MAX_WIDTH))
 		self.__arguments__ = {}
 		self.__last_error__ = 'No Error'
 
