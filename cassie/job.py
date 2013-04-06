@@ -107,7 +107,7 @@ class JobManager(threading.Thread):
 						self.logger.error('job ' + str(job_id) + ' encountered an error and is not set to tolerate exceptions')
 						jobs_for_removal.append(job_id)
 					else:
-						self.logger.warning('job ' + str(job_id) + ' encountered an error')
+						self.logger.warning('job ' + str(job_id) + ' encountered exception: ' + job_desc['job'].exception.__class__.__name__)
 				if isinstance(job_desc['expiration'], int):
 					if job_desc['expiration'] > 0:
 						job_desc['expiration'] -= 1

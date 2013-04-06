@@ -18,7 +18,7 @@ import traceback
 from sleekxmpp.xmlstream import ET
 from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
-from cassie.job import JobManager
+from cassie.job import JobManager, JobRequestDelete
 from cassie.imcontent import IMContentText, IMContentMarkdown
 from cassie import __version__
 
@@ -145,6 +145,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			module.init_bot(self)
 		self.custom_message_handlers = {}
 		self.custom_message_handler_lock = threading.RLock()
+		self.custom_message_handler_reaper_job_id = None
 	
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
@@ -506,6 +507,11 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		with self.custom_message_handler_lock:
 			self.logger.debug('setting custom message handler for ' + jid + ' to ' + callback.__name__)
 			self.custom_message_handlers[jid] = {'callback':callback, 'expiration':expiration}
+		# start the reaper if necessary
+		if self.custom_message_handler_reaper_job_id == None:
+			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes = 3)
+		elif not self.job_manager.job_exists(self.custom_message_handler_reaper_job_id):
+			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes = 3)
 	
 	def custom_message_handler_del(self, jid):
 		jid = str(jid)
@@ -513,6 +519,20 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if jid in self.custom_message_handlers:
 				del self.custom_message_handlers[jid]
 				self.logger.debug('deleting custom message handler for ' + jid)
+	
+	def custom_message_handler_reaper(self):
+		with self.custom_message_handler_lock:
+			handlers_for_removal = []
+			for jid, handler in self.custom_message_handlers.items():
+				expiration = handler['expiration']
+				if expiration <= datetime.datetime.utcnow():
+					handlers_for_removal.append(jid)
+			for jid in handlers_for_removal:
+				self.custom_message_handler_del(jid)
+			if not self.custom_message_handlers:
+				self.custom_message_handler_reaper_job_id = None
+				return JobRequestDelete()
+		return None
 	
 	def request_stop(self, sig = None, other = None):
 		if sig == None:

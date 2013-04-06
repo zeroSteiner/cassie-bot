@@ -12,6 +12,7 @@ from cassie.templates import CassieXMPPBotModule
 save_directory: /path/to/save/games
 binary: /usr/local/bin/dfrotz
 game: /path/to/game/file
+handler_timeout: 300
 """
 
 def is_read_ready(o, timeout):
@@ -77,7 +78,7 @@ class Module(CassieXMPPBotModule):
 	def cmd_frotz(self, args, jid):
 		parser = ArgumentParserLite('frotz', 'play games with frotz')
 		parser.add_argument('--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
-		parser.add_argument('--stop', dest = 'stop_game', action = 'store_true', help = 'stop playing the game')
+		parser.add_argument('--quit', dest = 'quit_game', action = 'store_true', help = 'quit playing the game')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -91,14 +92,14 @@ class Module(CassieXMPPBotModule):
 			self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
 			self.frotz_instances[user] = Frotz(self.options['game'], frotz_bin = self.options['binary'])
 			frotz = self.frotz_instances[user]
-			self.bot.custom_message_handler_add(jid, self.callback_play_game, 180)
+			self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 			return frotz.start_game()
 		
 		if not user in self.frotz_instances:
 			return 'Frotz is not currently running'
 		frotz = self.frotz_instances[user]
 
-		if results['stop_game']:
+		if results['quit_game']:
 			if frotz.running:
 				frotz.end_game()
 			del self.frotz_instances[user]
@@ -118,11 +119,12 @@ class Module(CassieXMPPBotModule):
 		cmd = msg.split(' ', 1)[0]
 		if cmd in ['save', 'restore', 'q', 'quit']:
 			return
-		self.bot.custom_message_handler_add(jid, self.callback_play_game, 180)
+		self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 		return frotz.interpret(msg)
 
 	def config_parser(self, config):
 		self.options['save_directory'] = config.get('save_directory')
 		self.options['binary'] = config.get('binary', 'dfrotz')
 		self.options['game'] = config.get('game')
+		self.options['handler_timeout'] = config.getint('handler_timeout', 300)
 		return self.options
