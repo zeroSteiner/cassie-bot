@@ -240,7 +240,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if session_id in self.custom_message_handlers:
 				expiration = self.custom_message_handlers[session_id]['expiration']
 				if expiration <= datetime.datetime.utcnow():
-					del self.custom_message_handlers[session_id]
+					self.custom_message_handler_del(session_id)
 				else:
 					custom_handler = self.custom_message_handlers[session_id]['callback']
 					try:
@@ -248,7 +248,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					except:
 						self.logger.error(str(jid.jid) + ' encountered an error with the ' + custom_handler.__name__ + ' custom message handler')
 						response = 'the message handler encountered an error'
-					self.message_process_response(response, msg)
+					self.send_message_formatted(jid, response, msg['type'])
 					return
 		
 		message_body = msg['body'].replace('\'', '').replace('-', '')
@@ -262,17 +262,16 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.records['failed message count'] += 1
 		return
 	
-	def message_process_response(self, response, msg):
-		if not response:
+	def send_message_formatted(self, mto, mbody, mtype = None):
+		if not mbody:
 			return
-		jid = msg['from']
-		if not isinstance(response, (IMContentMarkdown, IMContentText)):
-			response = IMContentText(response)
-		response.font = 'Monospace'
-		if msg['type'] == 'groupchat':
-			self.send_message(jid.bare, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
+		if not isinstance(mbody, (IMContentMarkdown, IMContentText)):
+			mbody = IMContentText(mbody)
+		mbody.font = 'Monospace'
+		if mtype == 'groupchat':
+			self.send_message(mto.bare, mbody.get_text(), mtype = mtype, mhtml = mbody.get_xhtml())
 		else:
-			self.send_message(jid, response.get_text(), mtype = msg['type'], mhtml = response.get_xhtml())
+			self.send_message(mto, mbody.get_text(), mtype = mtype, mhtml = mbody.get_xhtml())
 		return
 	
 	def message_command(self, msg):
@@ -309,7 +308,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			return
 		try:
 			response = cmd_handler(arguments, jid)
-			self.message_process_response(response, msg)
+			self.send_message_formatted(jid, response, msg['type'])
 			return
 		except Exception as error:
 			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
@@ -391,7 +390,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		if results['stop']:
 			self.request_stop()
 		return response
-				
+	
 	def cmd_help(self, args, jid):
 		response = 'Version: ' + __version__ + '\nAvailable Commands:\n'
 		commands = []
