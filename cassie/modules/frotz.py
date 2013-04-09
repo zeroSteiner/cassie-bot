@@ -1,6 +1,7 @@
 import os
 import pty
 import select
+import termios
 import subprocess
 
 from cassie.argparselite import ArgumentParserLite
@@ -23,44 +24,61 @@ def is_write_ready(i, timeout):
 
 class Frotz(object):
 	frotz_flags = ['-p']
-	def __init__(self, game_file, frotz_bin = 'dfrotz', read_timeout = 0.5):
+	def __init__(self, game_file, frotz_bin = 'dfrotz', read_timeout = 0.25):
 		self.read_timeout = read_timeout
 		if not os.access(game_file, os.R_OK):
 			raise Exception('invalid game file')
-		frotz_out_pty = pty.openpty()
 		command = [frotz_bin]
 		command.extend(self.frotz_flags)
 		command.append(game_file)
-		self.frotz_proc = subprocess.Popen(command, stdin = subprocess.PIPE, stdout = frotz_out_pty[1], stderr = subprocess.PIPE, bufsize = 1)
-		self.frotz_stdin = self.frotz_proc.stdin
-		self.frotz_stdout = os.fdopen(frotz_out_pty[0], 'rb', 0)
+
+		frotz_out_pty = pty.openpty()
+		# disable echoing input
+		settings = termios.tcgetattr(frotz_out_pty[0])
+		settings[3] = settings[3] & ~termios.ECHO
+		termios.tcsetattr(frotz_out_pty[0], termios.TCSADRAIN, settings)
+		
+		self.frotz_proc = subprocess.Popen(command, stdin = frotz_out_pty[1], stdout = frotz_out_pty[1], stderr = subprocess.PIPE, bufsize = 0)
+		self.frotz_stdin = os.fdopen(frotz_out_pty[0], 'wrb', 0)
+		self.frotz_stdout = self.frotz_stdin
 
 	def read_output(self):
 		output_line = []
 		while is_read_ready(self.frotz_stdout, self.read_timeout):
-			output_line.append(self.frotz_stdout.readline())
-		return ''.join(output_line)
+			output_line.append(self.frotz_stdout.read(1))
+		output = ''.join(output_line)
+		if output.endswith('>'):
+			output = output[:-1]
+		output = output.strip()
+		return output
+
+	def restore_game(self, restore_file):
+		self.frotz_stdin.write('restore\n')
+		self.read_output()
+		self.frotz_stdin.write(restore_file + '\n')
+		output = self.read_output()
+		return output
 
 	def start_game(self, restore_file = None):
 		output = self.read_output()
 		if restore_file:
-			self.frotz_stdin.write('restore\n')
-			self.frotz_stdin.flush()
-			self.frotz_stdin.write(restore_file + '\n')
-			self.frotz_stdin.flush()
+			output = self.restore_game(restore_file)
+		return output
+
+	def save_game(self, save_file):
+		self.frotz_stdin.write('save\n')
+		self.read_output()
+		self.frotz_stdin.write(save_file + '\n')
+		output = self.read_output()
+		if output.lower().startswith('overwrite existing file?'):
+			self.frotz_stdin.write('Y\n')
 			output = self.read_output()
-		if output.startswith('> '):
-			output = output[2:]
 		return output
 
 	def interpret(self, command):
 		command = command.strip()
-		self.frotz_stdout.flush()
 		self.frotz_stdin.write(command + '\n')
-		self.frotz_stdin.flush()
 		output = self.read_output()
-		if output.startswith('> '):
-			output = output[2:]
 		return output
 
 	def end_game(self):
