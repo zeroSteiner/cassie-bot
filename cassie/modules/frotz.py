@@ -54,7 +54,8 @@ class Frotz(object):
 
 	def restore_game(self, restore_file):
 		self.frotz_stdin.write('restore\n')
-		self.read_output()
+		if is_read_ready(self.frotz_stdout, self.read_timeout):
+			termios.tcflush(self.frotz_stdout, termios.TCIFLUSH)
 		self.frotz_stdin.write(restore_file + '\n')
 		output = self.read_output()
 		return output
@@ -67,7 +68,8 @@ class Frotz(object):
 
 	def save_game(self, save_file):
 		self.frotz_stdin.write('save\n')
-		self.read_output()
+		if is_read_ready(self.frotz_stdout, self.read_timeout):
+			termios.tcflush(self.frotz_stdout, termios.TCIFLUSH)
 		self.frotz_stdin.write(save_file + '\n')
 		output = self.read_output()
 		if output.lower().startswith('overwrite existing file?'):
@@ -95,8 +97,10 @@ class Module(CassieXMPPBotModule):
 
 	def cmd_frotz(self, args, jid):
 		parser = ArgumentParserLite('frotz', 'play games with frotz')
-		parser.add_argument('--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
-		parser.add_argument('--quit', dest = 'quit_game', action = 'store_true', help = 'quit playing the game')
+		parser.add_argument('-n', '--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
+		parser.add_argument('-q', '--quit', dest = 'quit_game', action = 'store_true', help = 'quit playing the game')
+		parser.add_argument('-s', '--save', dest = 'save_game', action = 'store_true', help = 'save the current game')
+		parser.add_argument('-r', '--restore', dest = 'restore_game', action = 'store_true', help = 'restore a previous game')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -104,29 +108,44 @@ class Module(CassieXMPPBotModule):
 			return parser.get_last_error()
 
 		user = str(jid.bare)
-		save_file_name = os.path.join(self.options['save_directory'], user + '.frotz')
+		game_file = self.options['game']
+		save_file_name = user.replace('@', '_at_') + '.' + os.path.splitext(os.path.basename(game_file))[0] + '.qzl'
+		save_file_path = os.path.join(self.options['save_directory'], save_file_name)
 
-		if results['new_game']:
-			self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
-			self.frotz_instances[user] = Frotz(self.options['game'], frotz_bin = self.options['binary'])
+		if results['new_game'] or results['restore_game']:
+			if results['new_game']:
+				self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
+			elif results['restore_game']:
+				self.logger.info(str(jid.jid) + ' is restoring a game with frotz')
+			self.frotz_instances[user] = Frotz(game_file, frotz_bin = self.options['binary'])
 			frotz = self.frotz_instances[user]
 			self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
-			return frotz.start_game()
+			output = frotz.start_game()
+			if results['restore_game']:
+				output = frotz.restore_game(save_file_path)
+			return output
 		
 		if not user in self.frotz_instances:
 			return 'Frotz is not currently running'
 		frotz = self.frotz_instances[user]
+		if not frotz.running:
+			return 'Frotz is not currently running'
+			del self.frotz_instances[user]
+			self.bot.custom_message_handler_del(jid)
+
+		if results['save_game']:
+			import pdb; pdb.set_trace()
+			return frotz.save_game(save_file_path)
 
 		if results['quit_game']:
-			if frotz.running:
-				frotz.end_game()
+			frotz.end_game()
 			del self.frotz_instances[user]
 			self.bot.custom_message_handler_del(jid)
 			return 'Ended Frotz game, thanks for playing'
 
 	def callback_play_game(self, msg, jid):
 		user = str(jid.bare)
-		save_file_name = os.path.join(self.options['save_directory'], user + '.frotz')
+
 		if not user in self.frotz_instances:
 			self.logger.error('callback_play_game executed but user has no Frotz instance')
 			return 'Not currently playing a game'
@@ -135,8 +154,8 @@ class Module(CassieXMPPBotModule):
 		if not msg:
 			return
 		cmd = msg.split(' ', 1)[0]
-		if cmd in ['save', 'restore', 'q', 'quit']:
-			return
+		if cmd in ['new', 'save', 'restore', 'q', 'quit']: # command to arguments ie new to -n and save to -s
+			return self.cmd_frotz(['-' + cmd[0]], jid)
 		self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 		return frotz.interpret(msg)
 
