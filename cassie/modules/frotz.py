@@ -134,7 +134,6 @@ class Module(CassieXMPPBotModule):
 			self.bot.custom_message_handler_del(jid)
 
 		if results['save_game']:
-			import pdb; pdb.set_trace()
 			return frotz.save_game(save_file_path)
 
 		if results['quit_game']:
