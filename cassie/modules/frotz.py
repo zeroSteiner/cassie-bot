@@ -134,9 +134,11 @@ class Module(CassieXMPPBotModule):
 			self.bot.custom_message_handler_del(jid)
 
 		if results['save_game']:
+			self.logger.debug(str(jid.jid) + ' is saving a game with frotz')
 			return frotz.save_game(save_file_path)
 
 		if results['quit_game']:
+			self.logger.debug(str(jid.jid) + ' is quitting a game with frotz')
 			frotz.end_game()
 			del self.frotz_instances[user]
 			self.bot.custom_message_handler_del(jid)
@@ -163,5 +165,5 @@ class Module(CassieXMPPBotModule):
 		self.options['save_directory'] = config.get('save_directory')
 		self.options['binary'] = config.get('binary', 'dfrotz')
 		self.options['game'] = config.get('game')
-		self.options['handler_timeout'] = config.getint('handler_timeout', 300)
+		self.options['handler_timeout'] = config.getint('handler_timeout', 600)
 		return self.options

@@ -67,12 +67,12 @@ def main():
 		return os.EX_CONFIG
 
 	# configure logging
-	logging.basicConfig(filename = settings['core_log_file'], level = getattr(logging, arguments.loglvl), format = "%(name)s\t %(levelname)-10s %(asctime)s %(message)s")
+	logging.basicConfig(filename = settings['core_log_file'], level = getattr(logging, arguments.loglvl), format = "%(name)-45s %(levelname)-10s %(asctime)s %(message)s")
 	logger = logging.getLogger('cassie.main')
 
 	if arguments.local or not arguments.fork or arguments.update:
 		console = logging.StreamHandler()
-		console.setFormatter(logging.Formatter("%(levelname)-10s: %(message)s"))
+		console.setFormatter(logging.Formatter("%(levelname)-10s %(message)s"))
 		logging.getLogger('').addHandler(console)
 
 	if settings['core_mode'] == 'xmpp':
