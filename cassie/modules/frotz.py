@@ -153,7 +153,8 @@ class Module(CassieXMPPBotModule):
 		if not msg:
 			return
 		cmd = msg.split(' ', 1)[0]
-		if cmd in ['new', 'save', 'restore', 'q', 'quit']: # command to arguments ie new to -n and save to -s
+		if cmd.lower() in ['new', 'save', 'restore', 'q', 'quit']: # command to arguments ie new to -n and save to -s
+			cmd = cmd.lower()
 			return self.cmd_frotz(['-' + cmd[0]], jid)
 		self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 		return frotz.interpret(msg)
