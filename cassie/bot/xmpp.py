@@ -190,7 +190,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.logger.info('successfully loaded ' + str(aimls_loaded) + ' AIML files into the kernel')
 		return aimls_loaded
 	
-	def join_chat_room(self, room, permissions = USER):
+	def chat_room_join(self, room, permissions = USER):
 		if room in self.plugin['xep_0045'].getJoinedRooms():
 			return
 		# rooms are technically authorized users
@@ -198,7 +198,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait = True)
 		self.logger.info('joined chat room: ' + room)
 	
-	def leave_chat_room(self, room):
+	def chat_room_leave(self, room):
 		if not room in self.plugin['xep_0045'].getJoinedRooms():
 			return
 		self.plugin['xep_0045'].leaveMUC(room, self.boundjid.use)
@@ -216,8 +216,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				continue
 			rooms_to_rejoin.append((room_name, details['lvl']))
 		for room_name, permissions in rooms_to_rejoin:
-			self.leave_chat_room(room_name)
-			self.join_chat_room(room_name, permissions)
+			self.chat_room_leave(room_name)
+			self.chat_room_join(room_name, permissions)
 	
 	def message(self, msg):
 		if not len(msg['body']):
@@ -385,8 +385,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		parser = ArgumentParserLite('bot', 'control the bot')
 		parser.add_argument('-l', '--log', dest = 'loglvl', action = 'store', default = None, help = 'set the bots logging level')
 		parser.add_argument('--shutdown', dest = 'stop', action = 'store_true', default = False, help = 'stop the bot from running')
-		parser.add_argument('--join', dest = 'join_chat_room', action = 'store', default = None, help = 'join a chat room')
-		parser.add_argument('--leave', dest = 'leave_chat_room', action = 'store', default = None, help = 'leave a chat room')
+		parser.add_argument('--join', dest = 'chat_room_join', action = 'store', default = None, help = 'join a chat room')
+		parser.add_argument('--leave', dest = 'chat_room_leave', action = 'store', default = None, help = 'leave a chat room')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -400,12 +400,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				log.setLevel(getattr(logging, results['loglvl']))
 				self.logger.info('successfully set the logging level to: ' + results['loglvl'])
 				response += 'Successfully set the logging level to: ' + results['loglvl']
-		if results['join_chat_room']:
-			self.join_chat_room(results['join_chat_room'])
-			response += 'Joined chat room: ' + results['join_chat_room']
-		if results['leave_chat_room']:
-			self.leave_chat_room(results['leave_chat_room'])
-			response += 'Left chat room: ' + results['leave_chat_room']
+		if results['chat_room_join']:
+			self.chat_room_join(results['chat_room_join'])
+			response += 'Joined chat room: ' + results['chat_room_join']
+		if results['chat_room_leave']:
+			self.chat_room_leave(results['chat_room_leave'])
+			response += 'Left chat room: ' + results['chat_room_leave']
 		if results['stop']:
 			self.request_stop()
 		return response

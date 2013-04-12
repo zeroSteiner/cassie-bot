@@ -131,5 +131,5 @@ class Module(CassieXMPPBotModule):
 	def send_report(self, report):
 		report = IMContentMarkdown(report, 'Monospace')
 		for room in self.report_rooms:
-			self.bot.join_chat_room(room)
+			self.bot.chat_room_join(room)
 			self.bot.send_message(room, report.get_text(), mtype = 'groupchat', mhtml = report.get_xhtml())

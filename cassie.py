@@ -179,7 +179,7 @@ def main():
 		signal.signal(signal.SIGHUP, xmpp.request_stop)
 		if xmpp.connect((settings['xmpp_server'], settings['xmpp_port'])):
 			if settings.get('xmpp_chat_room'):
-				xmpp.join_chat_room(settings['xmpp_chat_room'])
+				xmpp.chat_room_join(settings['xmpp_chat_room'])
 			xmpp.process(block = True)
 	if settings['core_mode'] == 'tcpserver':
 		server_address = (settings['tcpsrv_server'], settings['tcpsrv_port'])
