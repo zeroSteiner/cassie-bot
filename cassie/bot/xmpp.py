@@ -140,12 +140,21 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.job_manager = JobManager(logger_name = 'cassie.bot.xmpp.job_manager')
 		self.job_manager.start()
 		
-		self.bot_modules = modules
-		for module in modules.itervalues():
-			module.init_bot(self)
 		self.custom_message_handlers = {}
 		self.custom_message_handler_lock = threading.RLock()
 		self.custom_message_handler_reaper_job_id = None
+		
+		self.bot_modules = modules
+		self.command_permissions = {}
+		for command in map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))):
+			self.command_permissions[command] = ADMIN
+		for module in self.bot_modules.itervalues():
+			for command in module.commands:
+				self.command_permissions[command] = ADMIN
+		self.command_handler_set_permission('help', 'user')
+		
+		for module in modules.itervalues():
+			module.init_bot(self)
 	
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
@@ -181,7 +190,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.logger.info('successfully loaded ' + str(aimls_loaded) + ' AIML files into the kernel')
 		return aimls_loaded
 	
-	def join_chat_room(self, room, permissions = GUEST):
+	def join_chat_room(self, room, permissions = USER):
 		if room in self.plugin['xep_0045'].getJoinedRooms():
 			return
 		# rooms are technically authorized users
@@ -275,18 +284,34 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.send_message(mto, mbody.get_text(), mtype = mtype, mhtml = mbody.get_xhtml())
 		return
 	
+	def command_handler_get(self, command, userlvl):
+		if userlvl < self.command_permissions.get(command, ADMIN):
+			return None
+		cmd_handler = None
+		if hasattr(self, 'cmd_' + command):
+			cmd_handler = getattr(self, 'cmd_' + command)
+		else:
+			for module in self.bot_modules.itervalues():
+				if module.has_command(command):
+					cmd_handler = module.get_command_handler(command)
+					break
+		return cmd_handler
+	
+	def command_handler_set_permission(self, command, userlvl):
+		userlvl = userlvl.upper()
+		userlvl = {'GUEST':GUEST, 'USER':USER, 'ADMIN':ADMIN}[userlvl]
+		self.command_permissions[command] = userlvl
+	
 	def message_command(self, msg):
 		message = msg['body']
 		jid = msg['from']
 		user = self.authorized_users[jid.bare]
-		if user['lvl'] != ADMIN:
-			if msg['type'] != 'groupchat':
-				return
+		user_lvl = user['lvl']
+		if msg['type'] == 'groupchat':
 			guser = jid.resource + '@' + jid.server.split('.', 1)[1]
 			if not guser in self.authorized_users:
 				return
-			if self.authorized_users[guser]['lvl'] != ADMIN:
-				return
+			user_lvl = self.authorized_users[guser]['lvl']
 		arguments = shlex.split(message)
 		command = arguments.pop(0)
 		command = command[1:]
@@ -296,14 +321,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if len(command.split('.')) != 2:
 				return
 			command = command.split('.', 1)[1]
-		cmd_handler = None
-		if hasattr(self, 'cmd_' + command):
-			cmd_handler = getattr(self, 'cmd_' + command)
-		else:
-			for module in self.bot_modules.itervalues():
-				if module.has_command(command):
-					cmd_handler = module.get_command_handler(command)
-					break
+		cmd_handler = self.command_handler_get(command, user_lvl)
 		if not cmd_handler:
 			msg.reply('Command Not Found').send()
 			return
@@ -393,13 +411,20 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		return response
 	
 	def cmd_help(self, args, jid):
+		user = self.authorized_users[jid.bare]
+		user_lvl = user['lvl']
+
 		response = 'Version: ' + __version__ + '\nAvailable Commands:\n'
 		commands = []
-		commands.extend(map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))))
-		
+		for command in map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))):
+			if self.command_handler_get(command, user_lvl):
+				commands.append(command)
 		for module in self.bot_modules.itervalues():
-			commands.extend(module.commands)
-		commands.remove('help')
+			for command in module.commands:
+				if self.command_handler_get(command, user_lvl):
+					commands.append(command)
+		if 'help' in commands:
+			commands.remove('help')
 		response += '\n'.join(commands)
 		return response
 	
@@ -561,7 +586,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				if not msg['from'].bare in self.authorized_users:
 					break
 				user = self.authorized_users[msg['from'].bare]
-				if user['lvl'] < ADMIN:
+				if user['lvl'] != ADMIN:
 					break
 				if msg['from'].resource != 'botadmin':
 					break

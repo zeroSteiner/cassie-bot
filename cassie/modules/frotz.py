@@ -95,6 +95,10 @@ class Module(CassieXMPPBotModule):
 		CassieXMPPBotModule.__init__(self)
 		self.frotz_instances = {}
 
+	def init_bot(self, *args, **kwargs):
+		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
+		self.bot.command_handler_set_permission('frotz', 'user')
+
 	def cmd_frotz(self, args, jid):
 		parser = ArgumentParserLite('frotz', 'play games with frotz')
 		parser.add_argument('-n', '--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
