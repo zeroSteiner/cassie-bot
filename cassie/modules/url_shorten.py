@@ -4,6 +4,10 @@ from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
 
 class Module(CassieXMPPBotModule):
+	def init_bot(self, *args, **kwargs):
+		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
+		self.bot.command_handler_set_permission('url_shorten', 'user')
+
 	def cmd_url_shorten(self, args, jid):
 		parser = ArgumentParserLite('url_shorten', 'use a url shortener service')
 		parser.add_argument('-u', '--url', dest = 'url', default = None, required = True, help = 'url to shorten')

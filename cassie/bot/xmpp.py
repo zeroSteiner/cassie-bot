@@ -25,6 +25,8 @@ from cassie import __version__
 GUEST = 0
 USER = 1
 ADMIN = 2
+USER_LVL_NAME_TO_INT = {'GUEST':GUEST, 'USER':USER, 'ADMIN':ADMIN}
+USER_LVL_INT_TO_NAME = {GUEST:'GUEST', USER:'USER', ADMIN:'ADMIN'}
 
 class CassieUserManager(dict):
 	def __init__(self, *args, **kwargs):
@@ -298,8 +300,13 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		return cmd_handler
 	
 	def command_handler_set_permission(self, command, userlvl):
-		userlvl = userlvl.upper()
-		userlvl = {'GUEST':GUEST, 'USER':USER, 'ADMIN':ADMIN}[userlvl]
+		if isinstance(userlvl, str):
+			userlvl = userlvl.upper()
+			userlvl = USER_LVL_NAME_TO_INT[userlvl]
+		elif not isinstance(userlvl, (int, long)):
+			raise Exception('invalid userlvl type')
+		if not command in self.command_permissions:
+			raise Exception('can not set permission for unknown command: ' + repr(command))
 		self.command_permissions[command] = userlvl
 	
 	def message_command(self, msg):
@@ -487,10 +494,10 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		if not results:
 			return parser.get_last_error()
 		response = ''
-		if not results['permissions'].upper() in ['GUEST', 'USER', 'ADMIN']:
+		if not results['permissions'].upper() in USER_LVL_NAME_TO_INT:
 			return 'Invalid privilege level'
 		else:
-			privilege_level = {'GUEST':GUEST, 'USER':USER, 'ADMIN':ADMIN}[results['permissions'].upper()]
+			privilege_level = USER_LVL_NAME_TO_INT[results['permissions'].upper()]
 		if results['add user']:
 			if not results['add user'] in self.authorized_users:
 				self.authorized_users[results['add user']] = {'lvl':privilege_level, 'type':'user'}
@@ -510,7 +517,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				response += '\n'
 			response += 'User Listing:\n'
 			for user, user_desc in self.authorized_users.items():
-				response += user_desc['type'].upper() + ' ' + user + ' ' + {0:'Guest', 1:'User', 2:'Admin'}[user_desc['lvl']] + '\n'
+				response += user_desc['type'].upper() + ' ' + user + ' ' + USER_LVL_INT_TO_NAME[user_desc['lvl']] + '\n'
 			response += '\n'
 		if not response:
 			return 'Missing Action'
