@@ -517,7 +517,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				response += '\n'
 			response += 'User Listing:\n'
 			for user, user_desc in self.authorized_users.items():
-				response += user_desc['type'].upper() + ' ' + user + ' ' + USER_LVL_INT_TO_NAME[user_desc['lvl']] + '\n'
+				response += user_desc['type'].upper() + ' ' + user + ' ' + USER_LVL_INT_TO_NAME[user_desc['lvl']].capitalize() + '\n'
 			response += '\n'
 		if not response:
 			return 'Missing Action'

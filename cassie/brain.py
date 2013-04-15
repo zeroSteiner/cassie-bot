@@ -1,9 +1,4 @@
-import re
-import threading
 import aiml
-from copy import copy
-from time import sleep
-from httplib import CannotSendRequest
 
 def getError(elem):
 	for e in elem:
