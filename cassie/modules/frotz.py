@@ -118,7 +118,9 @@ class Module(CassieXMPPBotModule):
 
 		if results['list_games']:
 			resp = ['Available Games:']
-			resp.extend(self.options['games'].keys())
+			games = self.options['games'].keys()
+			games.sort()
+			resp.extend(games)
 			return resp
 
 		if results['new_game'] or results['restore_game']:
