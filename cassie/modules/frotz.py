@@ -12,8 +12,9 @@ from cassie.templates import CassieXMPPBotModule
 [mod_frotz]
 save_directory: /path/to/save/games
 binary: /usr/local/bin/dfrotz
-game: /path/to/game/file
 handler_timeout: 300
+# Games are listed here
+game0: Game0,/path/to/game/file
 """
 
 def is_read_ready(o, timeout):
@@ -41,6 +42,7 @@ class Frotz(object):
 		self.frotz_proc = subprocess.Popen(command, stdin = frotz_out_pty[1], stdout = frotz_out_pty[1], stderr = subprocess.PIPE, bufsize = 0)
 		self.frotz_stdin = os.fdopen(frotz_out_pty[0], 'wrb', 0)
 		self.frotz_stdout = self.frotz_stdin
+		self.frotz_game_file = game_file
 
 	def read_output(self):
 		output_line = []
@@ -100,19 +102,45 @@ class Module(CassieXMPPBotModule):
 		self.bot.command_handler_set_permission('frotz', 'user')
 
 	def cmd_frotz(self, args, jid):
-		parser = ArgumentParserLite('frotz', 'play games with frotz')
+		parser = ArgumentParserLite('frotz', 'play z-machine games with frotz', 'each user can create one save file per game')
 		parser.add_argument('-n', '--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
+		parser.add_argument('-r', '--restore', dest = 'restore_game', action = 'store_true', help = 'restore a previous game')
 		parser.add_argument('-q', '--quit', dest = 'quit_game', action = 'store_true', help = 'quit playing the game')
 		parser.add_argument('-s', '--save', dest = 'save_game', action = 'store_true', help = 'save the current game')
-		parser.add_argument('-r', '--restore', dest = 'restore_game', action = 'store_true', help = 'restore a previous game')
+		parser.add_argument('-g', '--game', dest = 'game', action = 'store', help = 'game to play')
+		parser.add_argument('--list-games', dest = 'list_games', action = 'store_true', help = 'list available games')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
 		if not results:
 			return parser.get_last_error()
-
 		user = str(jid.bare)
-		game_file = self.options['game']
+
+		if results['list_games']:
+			resp = ['Available Games:']
+			resp.extend(self.options['games'].keys())
+			return resp
+
+		if results['new_game'] or results['restore_game']:
+			if not results['game'] in self.options['games']:
+				if results['game'] == None:
+					msg = 'Please select a game with the -g option'
+				else:
+					msg = 'Invalid game file'
+				return msg + ', use --list-games to show available games'
+			game_file = self.options['games'][results['game']]
+		elif results['save_game'] or results['quit_game']:
+			if results['game']:
+				return 'Can\'t select a game with --save or --quit'
+			if not user in self.frotz_instances:
+				return 'Frotz is not currently running'
+			frotz = self.frotz_instances[user]
+			if not frotz.running:
+				del self.frotz_instances[user]
+				self.bot.custom_message_handler_del(jid)
+				return 'Frotz is not currently running'
+			game_file = frotz.frotz_game_file
+
 		save_file_name = user.replace('@', '_at_') + '.' + os.path.splitext(os.path.basename(game_file))[0] + '.qzl'
 		save_file_path = os.path.join(self.options['save_directory'], save_file_name)
 
@@ -128,14 +156,6 @@ class Module(CassieXMPPBotModule):
 			if results['restore_game']:
 				output = frotz.restore_game(save_file_path)
 			return output
-		
-		if not user in self.frotz_instances:
-			return 'Frotz is not currently running'
-		frotz = self.frotz_instances[user]
-		if not frotz.running:
-			return 'Frotz is not currently running'
-			del self.frotz_instances[user]
-			self.bot.custom_message_handler_del(jid)
 
 		if results['save_game']:
 			self.logger.debug(str(jid.jid) + ' is saving a game with frotz')
@@ -159,15 +179,36 @@ class Module(CassieXMPPBotModule):
 		if not msg:
 			return
 		cmd = msg.split(' ', 1)[0]
-		if cmd.lower() in ['new', 'save', 'restore', 'q', 'quit']: # command to arguments ie new to -n and save to -s
+		if cmd.lower() in ['new', 'restore', 'save', 'q', 'quit']:	# command to arguments ie new to --new and save to --save
 			cmd = cmd.lower()
-			return self.cmd_frotz(['-' + cmd[0]], jid)
+			if len(cmd) == 1:
+				args = ['-' + cmd[0]]
+			else:
+				args = ['--' + cmd]
+			if cmd in ['new', 'restore']:	# new and restore require a game to be specified
+				game = None
+				for game_name, game_file in self.options['games'].items():
+					if game_file == frotz.frotz_game_file:
+						game = game_name
+				if not game:
+					raise Exception('could not determine the current game name')
+				args.append('-g')
+				args.append(game)
+			return self.cmd_frotz(args, jid)
 		self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 		return frotz.interpret(msg)
 
 	def config_parser(self, config):
 		self.options['save_directory'] = config.get('save_directory')
 		self.options['binary'] = config.get('binary', 'dfrotz')
-		self.options['game'] = config.get('game')
 		self.options['handler_timeout'] = config.getint('handler_timeout', 600)
+		self.options['games'] = {}
+		for opt_name, opt_value in config.items():
+			if not opt_name.startswith('game'):
+				continue
+			game_name, game_file = opt_value.split(',', 1)
+			game_name = game_name.strip()
+			game_file = game_file.strip()
+			self.options['games'][game_name] = game_file
+		self.logger.debug('loaded ' + str(len(self.options['games'])) + ' zmachine games')
 		return self.options

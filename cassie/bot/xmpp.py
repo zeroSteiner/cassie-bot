@@ -257,8 +257,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					custom_handler = self.custom_message_handlers[session_id]['callback']
 					try:
 						response = custom_handler(msg['body'], jid)
-					except:
-						self.logger.error(str(jid.jid) + ' encountered an error with the ' + custom_handler.__name__ + ' custom message handler')
+					except Exception as err:
+						self.logger.error('custom message handler error - name: ' + custom_handler.__name__ + ' jid: ' + str(jid.jid) + ' exception: ' + err.__class__.__name__)
 						response = 'the message handler encountered an error'
 					self.send_message_formatted(jid, response, msg['type'])
 					return

@@ -53,4 +53,4 @@ class SectionConfigParser:
 		return self.config_parser.options(self.section_name)
 
 	def items(self):
-		self.config_parser.items(self.section_name)
+		return self.config_parser.items(self.section_name)
