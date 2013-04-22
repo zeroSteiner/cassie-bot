@@ -8,10 +8,8 @@ __version__ = '0.1'
 __all__ = ['JobRun', 'JobManager']
 
 def normalize_job_id(job_id):
-	if isinstance(job_id, (str, long)):
-		job_id = uuid.UUID(job_id)
 	if not isinstance(job_id, uuid.UUID):
-		raise Exception('invalid job id, must be uuid.UUID instance')
+		job_id = uuid.UUID(job_id)
 	return job_id
 
 class JobRequestDelete:

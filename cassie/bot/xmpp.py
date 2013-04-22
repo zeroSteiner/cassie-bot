@@ -3,6 +3,7 @@ import ssl
 import sys
 import aiml
 import time
+import uuid
 import shlex
 import pickle
 import signal
@@ -254,7 +255,10 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				if expiration <= datetime.datetime.utcnow():
 					self.custom_message_handler_del(session_id)
 				else:
-					custom_handler = self.custom_message_handlers[session_id]['callback']
+					handler_info = self.custom_message_handlers[session_id]
+					custom_handler = handler_info['callback']
+					if isinstance(handler_info['lifespan'], datetime.timedelta): # if the lifespan is set, adjust the expiration
+						handler_info['expiration'] = datetime.datetime.utcnow() + handler_info['lifespan']
 					try:
 						response = custom_handler(msg['body'], jid)
 					except Exception as err:
@@ -528,22 +532,44 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			response += 'Failed To Save User Database'
 		return response
 	
-	def custom_message_handler_add(self, jid, callback, expiration):
+	def custom_message_handler_add(self, jid, callback, expiration, reset_expiration = True):
 		jid = str(jid)
-		if isinstance(expiration, (int, float)):
-			expiration = datetime.datetime.utcnow() + datetime.timedelta(0, expiration)
+		handler_id = None
+		if isinstance(expiration, (int, long, float)):
+			lifespan = datetime.timedelta(0, expiration)
+			expiration = datetime.datetime.utcnow() + lifespan
 		elif isinstance(expiration, datetime.timedelta):
+			lifespan = expiration
 			expiration = datetime.datetime.utcnow() + expiration
-		elif not isinstance(expiration, datetime.datetime):
+		else:
 			raise Exception('unknown expiration format')
 		with self.custom_message_handler_lock:
+			handler_id = uuid.uuid4()
 			self.logger.debug('setting custom message handler for ' + jid + ' to ' + callback.__name__)
-			self.custom_message_handlers[jid] = {'callback':callback, 'expiration':expiration}
+			if not reset_expiration:
+				lifespan = None
+			self.custom_message_handlers[jid] = {'callback':callback, 'expiration':expiration, 'lifespan':lifespan, 'handler_id':handler_id}
 		# start the reaper if necessary
 		if self.custom_message_handler_reaper_job_id == None:
 			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes = 3)
 		elif not self.job_manager.job_exists(self.custom_message_handler_reaper_job_id):
 			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes = 3)
+		return handler_id
+	
+	def custom_message_handler_exists(self, jid = None, handler_id = None):
+		if not (bool(jid) ^ bool(handler_id)):
+			raise Exception('specify either jid or handler_id')
+		with self.custom_message_handler_lock:
+			if jid:
+				if jid in self.custom_message_handlers:
+					return True
+			if handler_id:
+				if not isinstance(handler_id, uuid.UUID):
+					handler_id = uuid.UUID(handler_id)
+				for jid, handler in self.custom_message_handlers.items():
+					if handler['handler_id'] == handler_id:
+						return True
+		return False
 	
 	def custom_message_handler_del(self, jid):
 		jid = str(jid)

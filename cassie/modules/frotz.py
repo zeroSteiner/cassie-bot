@@ -136,7 +136,7 @@ class Module(CassieXMPPBotModule):
 				return 'Can\'t select a game with --save or --quit'
 			if not user in self.frotz_instances:
 				return 'Frotz is not currently running'
-			frotz = self.frotz_instances[user]
+			frotz = self.frotz_instances[user]['frotz']
 			if not frotz.running:
 				del self.frotz_instances[user]
 				self.bot.custom_message_handler_del(jid)
@@ -151,9 +151,10 @@ class Module(CassieXMPPBotModule):
 				self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
 			elif results['restore_game']:
 				self.logger.info(str(jid.jid) + ' is restoring a game with frotz')
-			self.frotz_instances[user] = Frotz(game_file, frotz_bin = self.options['binary'])
-			frotz = self.frotz_instances[user]
-			self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
+			self.frotz_instances[user] = {'frotz':Frotz(game_file, frotz_bin = self.options['binary']), 'handler_id':None}
+			frotz = self.frotz_instances[user]['frotz']
+			handler_id = self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
+			self.frotz_instances[user]['handler_id'] = handler_id
 			output = frotz.start_game()
 			if results['restore_game']:
 				output = frotz.restore_game(save_file_path)
@@ -176,7 +177,7 @@ class Module(CassieXMPPBotModule):
 		if not user in self.frotz_instances:
 			self.logger.error('callback_play_game executed but user has no Frotz instance')
 			return 'Not currently playing a game'
-		frotz = self.frotz_instances[user]
+		frotz = self.frotz_instances[user]['frotz']
 		msg = msg.strip()
 		if not msg:
 			return
@@ -197,7 +198,6 @@ class Module(CassieXMPPBotModule):
 				args.append('-g')
 				args.append(game)
 			return self.cmd_frotz(args, jid)
-		self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 		return frotz.interpret(msg)
 
 	def config_parser(self, config):
