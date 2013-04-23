@@ -81,7 +81,7 @@ def main():
 			module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
 			for module_name in module_sections:
 				module_name = module_name[4:]
-				logger.info('loading module: ' + module_name)
+				logger.info('loading xmpp module: ' + module_name)
 				try:
 					module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
 					module_instance = module.Module()

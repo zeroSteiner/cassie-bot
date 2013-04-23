@@ -55,7 +55,7 @@ class Frotz(object):
 		output = output.strip()
 		return output
 
-	def restore_game(self, restore_file):
+	def game_restore(self, restore_file):
 		self.frotz_stdin.write('restore\n')
 		if is_read_ready(self.frotz_stdout, self.read_timeout):
 			termios.tcflush(self.frotz_stdout, termios.TCIFLUSH)
@@ -63,13 +63,13 @@ class Frotz(object):
 		output = self.read_output()
 		return output
 
-	def start_game(self, restore_file = None):
+	def game_start(self, restore_file = None):
 		output = self.read_output()
 		if restore_file:
-			output = self.restore_game(restore_file)
+			output = self.game_restore(restore_file)
 		return output
 
-	def save_game(self, save_file):
+	def game_save(self, save_file):
 		self.frotz_stdin.write('save\n')
 		if is_read_ready(self.frotz_stdout, self.read_timeout):
 			termios.tcflush(self.frotz_stdout, termios.TCIFLUSH)
@@ -86,7 +86,7 @@ class Frotz(object):
 		output = self.read_output()
 		return output
 
-	def end_game(self):
+	def game_end(self):
 		if not self.running:
 			return
 		self.frotz_proc.kill()
@@ -163,14 +163,14 @@ class Module(CassieXMPPBotModule):
 				frotz = self.frotz_instances[user]['frotz']
 				handler_id = self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 				self.frotz_instances[user]['handler_id'] = handler_id
-				output = frotz.start_game()
+				output = frotz.game_start()
 				if results['restore_game']:
-					output = frotz.restore_game(save_file_path)
+					output = frotz.game_restore(save_file_path)
 				return output
 
 			if results['save_game']:
 				self.logger.debug(str(jid.jid) + ' is saving a game with frotz')
-				return frotz.save_game(save_file_path)
+				return frotz.game_save(save_file_path)
 
 			if results['quit_game']:
 				self.logger.debug(str(jid.jid) + ' is quitting a game with frotz')
@@ -180,7 +180,7 @@ class Module(CassieXMPPBotModule):
 	def cleanup_game(self, user):
 		with self.frotz_instances_lock:
 			game_info = self.frotz_instances[user]
-			game_info['frotz'].end_game()
+			game_info['frotz'].game_end()
 			self.bot.custom_message_handler_del(handler_id = game_info['handler_id'], safe = True)
 			del self.frotz_instances[user]
 
