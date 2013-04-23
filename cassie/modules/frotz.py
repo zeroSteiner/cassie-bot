@@ -2,6 +2,7 @@ import os
 import pty
 import select
 import termios
+import threading
 import subprocess
 
 from cassie.argparselite import ArgumentParserLite
@@ -86,7 +87,10 @@ class Frotz(object):
 		return output
 
 	def end_game(self):
+		if not self.running:
+			return
 		self.frotz_proc.kill()
+		self.frotz_proc.wait()
 
 	@property
 	def running(self):
@@ -96,10 +100,12 @@ class Module(CassieXMPPBotModule):
 	def __init__(self):
 		CassieXMPPBotModule.__init__(self)
 		self.frotz_instances = {}
+		self.frotz_instances_lock = threading.RLock()
 
 	def init_bot(self, *args, **kwargs):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.bot.command_handler_set_permission('frotz', 'user')
+		self.job_id = self.bot.job_manager.job_add(self.game_reaper, hours = 0, minutes = 5, seconds = 0)
 
 	def cmd_frotz(self, args, jid):
 		parser = ArgumentParserLite('frotz', 'play z-machine games with frotz', 'each user can create one save file per game')
@@ -123,60 +129,72 @@ class Module(CassieXMPPBotModule):
 			resp.extend(games)
 			return resp
 
-		if results['new_game'] or results['restore_game']:
-			if not results['game'] in self.options['games']:
-				if results['game'] == None:
-					msg = 'Please select a game with the -g option'
-				else:
-					msg = 'Invalid game file'
-				return msg + ', use --list-games to show available games'
-			game_file = self.options['games'][results['game']]
-		elif results['save_game'] or results['quit_game']:
-			if results['game']:
-				return 'Can\'t select a game with --save or --quit'
-			if not user in self.frotz_instances:
-				return 'Frotz is not currently running'
-			frotz = self.frotz_instances[user]['frotz']
-			if not frotz.running:
-				del self.frotz_instances[user]
-				self.bot.custom_message_handler_del(jid)
-				return 'Frotz is not currently running'
-			game_file = frotz.frotz_game_file
+		with self.frotz_instances_lock:
+			if results['new_game'] or results['restore_game']:
+				if not results['game'] in self.options['games']:
+					if results['game'] == None:
+						msg = 'Please select a game with the -g option'
+					else:
+						msg = 'Invalid game file'
+					return msg + ', use --list-games to show available games'
+				game_file = self.options['games'][results['game']]
+			elif results['save_game'] or results['quit_game']:
+				if results['game']:
+					return 'Can\'t select a game with --save or --quit'
+				if not user in self.frotz_instances:
+					return 'Frotz is not currently running'
+				frotz = self.frotz_instances[user]['frotz']
+				if not frotz.running:
+					self.cleanup_game(user)
+					return 'Frotz is not currently running'
+				game_file = frotz.frotz_game_file
 
-		save_file_name = user.replace('@', '_at_') + '.' + os.path.splitext(os.path.basename(game_file))[0] + '.qzl'
-		save_file_path = os.path.join(self.options['save_directory'], save_file_name)
+			save_file_name = user.replace('@', '_at_') + '.' + os.path.splitext(os.path.basename(game_file))[0] + '.qzl'
+			save_file_path = os.path.join(self.options['save_directory'], save_file_name)
 
-		if results['new_game'] or results['restore_game']:
-			if results['new_game']:
-				self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
-			elif results['restore_game']:
-				self.logger.info(str(jid.jid) + ' is restoring a game with frotz')
-			self.frotz_instances[user] = {'frotz':Frotz(game_file, frotz_bin = self.options['binary']), 'handler_id':None}
-			frotz = self.frotz_instances[user]['frotz']
-			handler_id = self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
-			self.frotz_instances[user]['handler_id'] = handler_id
-			output = frotz.start_game()
-			if results['restore_game']:
-				output = frotz.restore_game(save_file_path)
-			return output
+			if results['new_game'] or results['restore_game']:
+				if user in self.frotz_instances:
+					self.cleanup_game(user)
+				if results['new_game']:
+					self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
+				elif results['restore_game']:
+					self.logger.info(str(jid.jid) + ' is restoring a game with frotz')
+				self.frotz_instances[user] = {'frotz':Frotz(game_file, frotz_bin = self.options['binary']), 'handler_id':None}
+				frotz = self.frotz_instances[user]['frotz']
+				handler_id = self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
+				self.frotz_instances[user]['handler_id'] = handler_id
+				output = frotz.start_game()
+				if results['restore_game']:
+					output = frotz.restore_game(save_file_path)
+				return output
 
-		if results['save_game']:
-			self.logger.debug(str(jid.jid) + ' is saving a game with frotz')
-			return frotz.save_game(save_file_path)
+			if results['save_game']:
+				self.logger.debug(str(jid.jid) + ' is saving a game with frotz')
+				return frotz.save_game(save_file_path)
 
-		if results['quit_game']:
-			self.logger.debug(str(jid.jid) + ' is quitting a game with frotz')
-			frotz.end_game()
+			if results['quit_game']:
+				self.logger.debug(str(jid.jid) + ' is quitting a game with frotz')
+				self.cleanup_game(user)
+				return 'Ended Frotz game, thanks for playing'
+
+	def cleanup_game(self, user):
+		with self.frotz_instances_lock:
+			game_info = self.frotz_instances[user]
+			game_info['frotz'].end_game()
+			self.bot.custom_message_handler_del(handler_id = game_info['handler_id'], safe = True)
 			del self.frotz_instances[user]
-			self.bot.custom_message_handler_del(jid)
-			return 'Ended Frotz game, thanks for playing'
+
+	def game_reaper(self):
+		with self.frotz_instances_lock:
+			games_for_removal = []
+			for user, game_info in self.frotz_instances.items():
+				if not self.bot.custom_message_handler_exists(handler_id = game_info['handler_id']):
+					games_for_removal.append(user)
+			for user in games_for_removal:
+				self.cleanup_game(user)
 
 	def callback_play_game(self, msg, jid):
 		user = str(jid.bare)
-
-		if not user in self.frotz_instances:
-			self.logger.error('callback_play_game executed but user has no Frotz instance')
-			return 'Not currently playing a game'
 		frotz = self.frotz_instances[user]['frotz']
 		msg = msg.strip()
 		if not msg:

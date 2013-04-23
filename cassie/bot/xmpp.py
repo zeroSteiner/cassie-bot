@@ -253,7 +253,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if session_id in self.custom_message_handlers:
 				expiration = self.custom_message_handlers[session_id]['expiration']
 				if expiration <= datetime.datetime.utcnow():
-					self.custom_message_handler_del(session_id)
+					self.custom_message_handler_del(jid = session_id)
 				else:
 					handler_info = self.custom_message_handlers[session_id]
 					custom_handler = handler_info['callback']
@@ -571,12 +571,28 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 						return True
 		return False
 	
-	def custom_message_handler_del(self, jid):
-		jid = str(jid)
+	def custom_message_handler_del(self, jid = None, handler_id = None, safe = False):
+		if not (bool(jid) ^ bool(handler_id)):
+			raise Exception('specify either jid or handler_id')
 		with self.custom_message_handler_lock:
-			if jid in self.custom_message_handlers:
-				del self.custom_message_handlers[jid]
-				self.logger.debug('deleting custom message handler for ' + jid)
+			if jid:
+				jid = str(jid)
+				if jid in self.custom_message_handlers:
+					del self.custom_message_handlers[jid]
+					self.logger.debug('deleting custom message handler for ' + jid)
+					return
+			if handler_id:
+				if not isinstance(handler_id, uuid.UUID):
+					handler_id = uuid.UUID(handler_id)
+				for jid, handler in self.custom_message_handlers.items():
+					if handler['handler_id'] == handler_id:
+						del self.custom_message_handlers[jid]
+						self.logger.debug('deleting custom message handler for ' + jid)
+						return
+		if safe:
+			self.logger.info('the specified custom message handler does not exist')
+			return
+		raise Exception('the specified custom message handler does not exist')
 	
 	def custom_message_handler_reaper(self):
 		with self.custom_message_handler_lock:
@@ -586,7 +602,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				if expiration <= datetime.datetime.utcnow():
 					handlers_for_removal.append(jid)
 			for jid in handlers_for_removal:
-				self.custom_message_handler_del(jid)
+				self.custom_message_handler_del(jid = jid)
 			if not self.custom_message_handlers:
 				self.custom_message_handler_reaper_job_id = None
 				return JobRequestDelete()
