@@ -260,7 +260,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					if isinstance(handler_info['lifespan'], datetime.timedelta): # if the lifespan is set, adjust the expiration
 						handler_info['expiration'] = datetime.datetime.utcnow() + handler_info['lifespan']
 					try:
-						response = custom_handler(msg['body'], jid)
+						response = custom_handler(msg['body'], jid, handler_info['handler_id'])
 					except Exception as err:
 						self.logger.error('custom message handler error - name: ' + custom_handler.__name__ + ' jid: ' + str(jid.jid) + ' exception: ' + err.__class__.__name__)
 						response = 'the message handler encountered an error'

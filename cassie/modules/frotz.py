@@ -193,7 +193,7 @@ class Module(CassieXMPPBotModule):
 			for user in games_for_removal:
 				self.cleanup_game(user)
 
-	def callback_play_game(self, msg, jid):
+	def callback_play_game(self, msg, jid, handler_id):
 		user = str(jid.bare)
 		frotz = self.frotz_instances[user]['frotz']
 		msg = msg.strip()
