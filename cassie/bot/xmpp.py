@@ -249,6 +249,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.logger.debug('received OTR negotiation request from user ' + session_id)
 			return
 		
+		if msg['type'] == 'groupchat':
+			message = message.split(' ', 1)
+			if len(message) != 2:
+				return
+			message = message[1]
+		
 		with self.custom_message_handler_lock:
 			if session_id in self.custom_message_handlers:
 				expiration = self.custom_message_handlers[session_id]['expiration']
@@ -260,14 +266,14 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 					if isinstance(handler_info['lifespan'], datetime.timedelta): # if the lifespan is set, adjust the expiration
 						handler_info['expiration'] = datetime.datetime.utcnow() + handler_info['lifespan']
 					try:
-						response = custom_handler(msg['body'], jid, handler_info['handler_id'])
+						response = custom_handler(message, jid, handler_info['handler_id'])
 					except Exception as err:
 						self.logger.error('custom message handler error - name: ' + custom_handler.__name__ + ' jid: ' + str(jid.jid) + ' exception: ' + err.__class__.__name__)
 						response = 'the message handler encountered an error'
 					self.send_message_formatted(jid, response, msg['type'])
 					return
 		
-		message_body = msg['body'].replace('\'', '').replace('-', '')
+		message_body = message.replace('\'', '').replace('-', '')
 		self.records['message count'] += 1
 		self.brain.setPredicate('client-name', str(jid.user), session_id)
 		self.logger.debug('received input \'' + message_body + '\' from user: ' + session_id)
