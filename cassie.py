@@ -152,7 +152,7 @@ def main():
 			return os.EX_OK
 
 	if settings['core_mode'] == 'xmpp':
-		xmpp = CassieXMPPBot(
+		cassie_bot = CassieXMPPBot(
 			settings['xmpp_jid'],
 			settings['xmpp_password'],
 			settings['xmpp_admin'],
@@ -161,6 +161,10 @@ def main():
 			settings['aiml_botmaster'],
 			modules
 		)
+	elif settings['core_mode'] == 'tcpserver':
+		server_address = (settings['tcpsrv_server'], settings['tcpsrv_port'])
+		cassie_bot = CassieTCPBot(server_address, settings['aiml_path'], settings['aiml_botmaster'], PROMPT)
+
 	if settings.get('core_setuid'):
 		if os.getuid() == 0:
 			try:
@@ -168,23 +172,23 @@ def main():
 				os.setreuid(settings['core_setuid'], settings['core_setuid'])
 			except:
 				logger.critical('could not set the gid and uid to: ' + str(settings['core_setuid']))
-				return os.EX_OK
+				return os.EX_OSERR
 			logger.info('successfully set the gid and uid to: ' + str(settings['core_setuid']))
 		elif os.getuid() != 0:
 			logger.error('cannot setuid when not executed as root')
-	
+
 	if settings['core_mode'] == 'xmpp':
-		signal.signal(signal.SIGTERM, xmpp.request_stop)
-		signal.signal(signal.SIGINT, xmpp.request_stop)
-		signal.signal(signal.SIGHUP, xmpp.request_stop)
-		if xmpp.connect((settings['xmpp_server'], settings['xmpp_port'])):
-			if settings.get('xmpp_chat_room'):
-				xmpp.chat_room_join(settings['xmpp_chat_room'])
-			xmpp.process(block = True)
-	if settings['core_mode'] == 'tcpserver':
-		server_address = (settings['tcpsrv_server'], settings['tcpsrv_port'])
-		tcpserver = CassieTCPBot(server_address, settings['aiml_path'], settings['aiml_botmaster'], PROMPT)
-		tcpserver.serve_forever()
+		if not cassie_bot.connect((settings['xmpp_server'], settings['xmpp_port'])):
+			logger.error('connecting to the remote xmpp server failed')
+			return os.EX_UNAVAILABLE
+		if settings.get('xmpp_chat_room'):
+			cassie_bot.chat_room_join(settings['xmpp_chat_room'])
+
+	signal.signal(signal.SIGTERM, cassie_bot.bot_request_stop)
+	signal.signal(signal.SIGINT, cassie_bot.bot_request_stop)
+	signal.signal(signal.SIGHUP, cassie_bot.bot_request_stop)
+
+	cassie_bot.bot_run()
 	return os.EX_OK
 
 if __name__ == '__main__':

@@ -21,6 +21,7 @@ from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
 from cassie.job import JobManager, JobRequestDelete
 from cassie.imcontent import IMContentText, IMContentMarkdown
+from cassie.templates import CassieGenericBot
 from cassie import __version__
 
 GUEST = 0
@@ -102,7 +103,7 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 			self.aimls_reloaded.set()
 		return
 
-class CassieXMPPBot(sleekxmpp.ClientXMPP):
+class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 	def __init__(self, jid, password, admin, users_file, aimls_path, botmaster, modules = {}):
 		self.__shutdown__ = False
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
@@ -424,7 +425,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.chat_room_leave(results['chat_room_leave'])
 			response += 'Left chat room: ' + results['chat_room_leave']
 		if results['stop']:
-			self.request_stop()
+			self.bot_request_stop()
 		return response
 	
 	def cmd_help(self, args, jid):
@@ -614,14 +615,17 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				return JobRequestDelete()
 		return None
 	
-	def request_stop(self, sig = None, other = None):
-		if sig == None:
+	def bot_run(self):
+		self.process(block = True)
+	
+	def bot_request_stop(self, signum = None, frame = None):
+		if signum == None:
 			self.logger.warning('received shutdown command, proceeding to stop')
-		elif sig == signal.SIGTERM:
+		elif signum == signal.SIGTERM:
 			self.logger.warning('received SIGTERM signal, proceeding to stop')
-		elif sig == signal.SIGINT:
+		elif signum == signal.SIGINT:
 			self.logger.warning('received SIGINT signal, proceeding to stop')
-		elif sig == signal.SIGHUP:
+		elif signum == signal.SIGHUP:
 			self.logger.warning('received SIGHUP signal, proceeding to stop')
 		self.__shutdown__ = True
 		self.disconnect()

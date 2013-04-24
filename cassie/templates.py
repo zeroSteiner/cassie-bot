@@ -1,5 +1,12 @@
 import logging
 
+class CassieGenericBot(object):
+	def bot_request_stop(self, signum, frame):
+		pass
+
+	def bot_run(self):
+		raise NotImplementedError()
+
 class CassieXMPPBotModule(object):
 	def __init__(self):
 		self.options = {}

@@ -2,6 +2,7 @@ import os
 import logging
 import SocketServer
 from cassie.brain import Brain as CassieAimlBrain
+from cassie.templates import CassieGenericBot
 
 class CassieSocketRequestHandler(SocketServer.BaseRequestHandler):
 	def handle(self):
@@ -15,7 +16,7 @@ class CassieSocketRequestHandler(SocketServer.BaseRequestHandler):
 		except:
 			pass
 		
-class CassieTCPBot(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class CassieTCPBot(SocketServer.ThreadingMixIn, SocketServer.TCPServer, CassieGenericBot):
 	def __init__(self, bindinfo, aimls_path, botmaster, prompt):
 		__shutdown__ = False
 		SocketServer.TCPServer.__init__(self, bindinfo, CassieSocketRequestHandler)
@@ -33,3 +34,6 @@ class CassieTCPBot(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 		self.logger.info("the AIML kernel contains {:,} categories".format(self.brain.numCategories()))
 		self.RequestHandlerClass.brain = self.brain
 		self.RequestHandlerClass.prompt = prompt
+
+	def bot_run(self):
+		self.serve_forever()
