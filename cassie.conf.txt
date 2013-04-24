@@ -1,0 +1,35 @@
+# This is an example configuration file for cassie. Rename it to cassie.conf and
+# modify the options appropriately. An alternative config file can be specified
+# with the -c/--config parameter.
+
+# Set the main directory
+[DEFAULT]
+cassie_dir: /opt/cassie-bot
+
+[core]
+log_file: %(cassie_dir)s/cassie_log.txt
+pid_file: /var/run/cassie.pid
+setuid: 65534
+mode: xmpp
+
+[xmpp]
+jid: cassie@server/cassiebot
+password: SuperSecretPassword
+server: chat.server.local
+port: 443
+admin: administrator@server
+users_file: %(cassie_dir)s/users.dat
+chat_room: lobby@rooms.server
+
+[tcpserver]
+server: 0.0.0.0
+port: 4073
+
+[aiml]
+path: %(cassie_dir)s/aimls
+botmaster: administrator
+
+# Load XMPP modules below
+[mod_url_shorten]
+
+[mod_cyclic_pattern]
