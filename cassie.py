@@ -24,13 +24,14 @@ else:
 	raw_input = input
 
 def main():
-	parser = ArgumentParser(description = 'Cassie: Chat Bot For Offensive Security Testing', conflict_handler='resolve')
-	parser.add_argument('-c', '--config', dest = 'config_path', action = 'store', default = 'cassie.conf', help = 'path to the config file')
+	parser = ArgumentParser(description = 'Cassie: Chat Bot For Offensive Security Testing', conflict_handler = 'resolve')
+	parser.add_argument('-c', '--config', dest = 'config_path', action = 'store', default = 'cassie.conf', help = 'path to the configuration file')
 	parser.add_argument('-f', '--foreground', dest = 'fork', action = 'store_false', default = True, help = 'run in foreground/do not fork a new process')
 	parser.add_argument('-u', '--update', dest = 'update', action = 'store_true', default = False, help = 'log in and update the currently loaded AIML set')
 	parser.add_argument('-l', '--local', dest = 'local', action = 'store_true', default = False, help = 'start a local AIML interpreter prompt')
 	parser.add_argument('-v', '--version', action = 'version', version = parser.prog + ' Version: ' + __version__)
 	parser.add_argument('-L', '--log', dest = 'loglvl', action = 'store', choices = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default = 'WARNING', help = 'set the logging level') 
+	parser.epilog = 'If no configuration file is specified cassie.conf will be used.'
 	arguments = parser.parse_args()
 	
 	config = ConfigParser()
@@ -159,7 +160,8 @@ def main():
 			settings['xmpp_users_file'],
 			settings['aiml_path'],
 			settings['aiml_botmaster'],
-			modules
+			modules,
+			settings.get('xmpp_chat_room')
 		)
 	elif settings['core_mode'] == 'tcpserver':
 		server_address = (settings['tcpsrv_server'], settings['tcpsrv_port'])
@@ -181,8 +183,6 @@ def main():
 		if not cassie_bot.connect((settings['xmpp_server'], settings['xmpp_port'])):
 			logger.error('connecting to the remote xmpp server failed')
 			return os.EX_UNAVAILABLE
-		if settings.get('xmpp_chat_room'):
-			cassie_bot.chat_room_join(settings['xmpp_chat_room'])
 
 	signal.signal(signal.SIGTERM, cassie_bot.bot_request_stop)
 	signal.signal(signal.SIGINT, cassie_bot.bot_request_stop)

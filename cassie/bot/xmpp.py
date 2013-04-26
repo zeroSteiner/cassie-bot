@@ -104,7 +104,7 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		return
 
 class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
-	def __init__(self, jid, password, admin, users_file, aimls_path, botmaster, modules = {}):
+	def __init__(self, jid, password, admin, users_file, aimls_path, botmaster, modules = {}, chat_room = None):
 		self.__shutdown__ = False
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
 		self.register_plugin('xep_0004') # Data Forms
@@ -159,6 +159,9 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		
 		for module in modules.itervalues():
 			module.init_bot(self)
+		
+		if chat_room:
+			self.authorized_users[chat_room] = {'lvl':USER, 'type':'room'}
 	
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
