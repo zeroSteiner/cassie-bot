@@ -1,4 +1,5 @@
 # Cassie daemon systemd config file
+# This file goes in /lib/systemd/system/
 
 [Unit]
 Description=Cassie chat bot daemon
