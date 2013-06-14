@@ -1,4 +1,5 @@
 import aiml
+import types
 
 def getError(elem):
 	for e in elem:
@@ -38,12 +39,11 @@ class Brain(object, aiml.Kernel):
 	def __del__(self):
 		self.stop()
 	
-	@classmethod
-	def add_element_parser(cls, handler, tag_name, validation_info):
-		cls_method = types.MethodType(handler, cls)
+	def add_element_parser(self, handler, tag_name, validation_info):
+		cls_method = types.MethodType(handler, self)
 		self._elementProcessors[tag_name] = cls_method
 		aiml.AimlParser.AimlHandler._validationInfo101[tag_name] = validation_info
-		return setattr(cls, handler.__name__, cls_method)
+		return setattr(self, handler.__name__, cls_method)
 			
 	def _processError(self, elem, sessionID):
 		newPhrase = ''
