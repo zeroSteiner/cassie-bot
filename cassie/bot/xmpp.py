@@ -104,7 +104,7 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		return
 
 class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
-	def __init__(self, jid, password, admin, users_file, aimls_path, botmaster, modules = {}, chat_room = None):
+	def __init__(self, jid, password, admin, users_file, aimls_path, aimls_plugin_path, botmaster, modules = {}, chat_room = None):
 		self.__shutdown__ = False
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
 		self.register_plugin('xep_0004') # Data Forms
@@ -136,6 +136,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			self.authorized_users[admin] = {'lvl':ADMIN, 'type':'user'}
 		self.administrator = admin
 		self.aimls_path = os.path.abspath(aimls_path)
+		self.aimls_plugin_path = os.path.abspath(aimls_plugin_path)
 		self.aiml_set_load()
 		self.records['brain init time'] = time.time()
 		self.records['init time'] = time.time()
@@ -157,7 +158,11 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 				self.command_permissions[command] = ADMIN
 		self.command_handler_set_permission('help', 'user')
 		
-		for module in modules.itervalues():
+		for module_name, module in modules.iteritems():
+			plugin_aiml = os.path.join(self.aimls_plugin_path, module_name + '.aiml')
+			if os.path.isfile(plugin_aiml):
+				self.logger.info("loading aiml file for plugin '{0}'".format(module_name))
+				self.brain.learn(plugin_aiml)
 			module.init_bot(self)
 		
 		if chat_room:

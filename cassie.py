@@ -44,6 +44,7 @@ def main():
 		pid_file = config.get('core', 'pid_file')
 		settings['core_mode'] = config.get('core', 'mode').lower()
 		settings['aiml_path'] = config.get('aiml', 'path')
+		settings['aiml_plugin_path'] = config.get('aiml', 'plugin_path')
 		settings['aiml_botmaster'] = config.get('aiml', 'botmaster')
 		
 		if config.has_section('xmpp'):
@@ -159,6 +160,7 @@ def main():
 			settings['xmpp_admin'],
 			settings['xmpp_users_file'],
 			settings['aiml_path'],
+			settings['aiml_plugin_path'],
 			settings['aiml_botmaster'],
 			modules,
 			settings.get('xmpp_chat_room')
