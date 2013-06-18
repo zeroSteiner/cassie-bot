@@ -8,7 +8,7 @@ class Module(CassieXMPPBotModule):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.bot.command_handler_set_permission('url_shorten', 'user')
 
-	def cmd_url_shorten(self, args, jid):
+	def cmd_url_shorten(self, args, jid, is_muc):
 		parser = ArgumentParserLite('url_shorten', 'use a url shortener service')
 		parser.add_argument('-u', '--url', dest = 'url', default = None, required = True, help = 'url to shorten')
 		if not len(args):

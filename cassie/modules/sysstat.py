@@ -3,7 +3,7 @@ from cassie.utils import generate_progress_bar
 from cassie.templates import CassieXMPPBotModule
 
 class Module(CassieXMPPBotModule):
-	def cmd_sysstat(self, args, jid):
+	def cmd_sysstat(self, args, jid, is_muc):
 		response = []
 		mp_lengths = map(lambda x:len(x.mountpoint), psutil.disk_partitions())
 		mp_lengths.sort()

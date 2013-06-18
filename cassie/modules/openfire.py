@@ -44,7 +44,7 @@ class Module(CassieXMPPBotModule):
 		else:
 			return 'An unknown error occurred'
 	
-	def cmd_openfire(self, args, jid):
+	def cmd_openfire(self, args, jid, is_muc):
 		parser = ArgumentParserLite('openfire', 'manager users on openfire')
 		parser.add_argument('-a', '--add', dest = 'add_user', default = None, help = 'username to add')
 		parser.add_argument('-d', '--del', dest = 'del_user', default = None, help = 'username to delete')

@@ -263,6 +263,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			if len(message) != 2:
 				return
 			message = message[1]
+			session_id = str(jid.bare)
 		
 		with self.custom_message_handler_lock:
 			if session_id in self.custom_message_handlers:
@@ -352,7 +353,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			msg.reply('Command Not Found').send()
 			return
 		try:
-			response = cmd_handler(arguments, jid)
+			response = cmd_handler(arguments, jid, (msg['type'] == 'groupchat'))
 			self.send_message_formatted(jid, response, msg['type'])
 			return
 		except Exception as error:
@@ -364,7 +365,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			self.logger.error(error.__repr__())
 		return
 	
-	def cmd_aiml(self, args, jid):
+	def cmd_aiml(self, args, jid, is_muc):
 		parser = ArgumentParserLite('aiml', 'control the AIML kernel')
 		parser.add_argument('-u', '--update', dest = 'update', default = None, help = 'update aiml files from URL')
 		parser.add_argument('-r', '--reload', dest = 'reload', action = 'store_true', default = False, help = 'reload .aiml files')
@@ -407,7 +408,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			response += 'Successfully Reset The AIML Brain\n'
 		return response
 	
-	def cmd_bot(self, args, jid):
+	def cmd_bot(self, args, jid, is_muc):
 		parser = ArgumentParserLite('bot', 'control the bot')
 		parser.add_argument('-l', '--log', dest = 'loglvl', action = 'store', default = None, help = 'set the bots logging level')
 		parser.add_argument('--shutdown', dest = 'stop', action = 'store_true', default = False, help = 'stop the bot from running')
@@ -436,7 +437,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			self.bot_request_stop()
 		return response
 	
-	def cmd_help(self, args, jid):
+	def cmd_help(self, args, jid, is_muc):
 		user = self.authorized_users[jid.bare]
 		user_lvl = user['lvl']
 
@@ -454,7 +455,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		response += '\n'.join(commands)
 		return response
 	
-	def cmd_info(self, args, jid):
+	def cmd_info(self, args, jid, is_muc):
 		MINUTE = 60
 		HOUR = 60 * MINUTE
 		DAY = 24 * HOUR
@@ -501,7 +502,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		response += "XMPP Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
 		return response[:-1]
 	
-	def cmd_user(self, args, jid):
+	def cmd_user(self, args, jid, is_muc):
 		parser = ArgumentParserLite('user', 'add/delete/modify users')
 		parser.add_argument('-a', '--add', dest = 'add user', action = 'store', default = None, help = 'add user')
 		parser.add_argument('-d', '--del', dest = 'delete user', action = 'store', default = None, help = 'delete user')

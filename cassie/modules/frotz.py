@@ -107,7 +107,7 @@ class Module(CassieXMPPBotModule):
 		self.bot.command_handler_set_permission('frotz', 'user')
 		self.job_id = self.bot.job_manager.job_add(self.game_reaper, hours = 0, minutes = 5, seconds = 0)
 
-	def cmd_frotz(self, args, jid):
+	def cmd_frotz(self, args, jid, is_muc):
 		parser = ArgumentParserLite('frotz', 'play z-machine games with frotz', 'each user can create one save file per game')
 		parser.add_argument('-n', '--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
 		parser.add_argument('-r', '--restore', dest = 'restore_game', action = 'store_true', help = 'restore a previous game')
@@ -161,7 +161,10 @@ class Module(CassieXMPPBotModule):
 					self.logger.info(str(jid.jid) + ' is restoring a game with frotz')
 				self.frotz_instances[user] = {'frotz':Frotz(game_file, frotz_bin = self.options['binary']), 'handler_id':None}
 				frotz = self.frotz_instances[user]['frotz']
-				handler_id = self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
+				if is_muc:
+					handler_id = self.bot.custom_message_handler_add(jid.bare, self.callback_play_game, self.options['handler_timeout'])
+				else:
+					handler_id = self.bot.custom_message_handler_add(jid, self.callback_play_game, self.options['handler_timeout'])
 				self.frotz_instances[user]['handler_id'] = handler_id
 				output = frotz.game_start()
 				if results['restore_game']:
