@@ -30,10 +30,10 @@ def main():
 	parser.add_argument('-u', '--update', dest = 'update', action = 'store_true', default = False, help = 'log in and update the currently loaded AIML set')
 	parser.add_argument('-l', '--local', dest = 'local', action = 'store_true', default = False, help = 'start a local AIML interpreter prompt')
 	parser.add_argument('-v', '--version', action = 'version', version = parser.prog + ' Version: ' + __version__)
-	parser.add_argument('-L', '--log', dest = 'loglvl', action = 'store', choices = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default = 'WARNING', help = 'set the logging level') 
+	parser.add_argument('-L', '--log', dest = 'loglvl', action = 'store', choices = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default = 'WARNING', help = 'set the logging level')
 	parser.epilog = 'If no configuration file is specified cassie.conf will be used.'
 	arguments = parser.parse_args()
-	
+
 	config = ConfigParser()
 	config.read(arguments.config_path)
 	settings = {}
@@ -46,7 +46,7 @@ def main():
 		settings['aiml_path'] = config.get('aiml', 'path')
 		settings['aiml_plugin_path'] = config.get('aiml', 'plugin_path')
 		settings['aiml_botmaster'] = config.get('aiml', 'botmaster')
-		
+
 		if config.has_section('xmpp'):
 			settings['xmpp_jid'] = config.get('xmpp', 'jid')
 			settings['xmpp_password'] = config.get('xmpp', 'password')
@@ -56,13 +56,13 @@ def main():
 			settings['xmpp_users_file'] = config.get('xmpp', 'users_file')
 			if config.has_option('xmpp', 'chat_room'):
 				settings['xmpp_chat_room'] = config.get('xmpp', 'chat_room')
-		
+
 		if config.has_section('tcpserver'):
 			settings['tcpsrv_server'] = config.get('tcpserver', 'server')
 			settings['tcpsrv_port'] = config.getint('tcpserver', 'port')
-		
+
 	except NoOptionError as err:
-		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
+		print 'Could Not Validate Option: \'' + err.option + '\' From Config File.'
 		return os.EX_CONFIG
 	except ValueError as err:
 		print 'Invalid Option ' + err.message + ' From Config File.'
@@ -121,7 +121,7 @@ def main():
 			pass
 		print ''
 		return os.EX_OK
-	
+
 	if arguments.update:
 		print 'Authenticating as: ' + settings['xmpp_admin']
 		try:
@@ -134,7 +134,7 @@ def main():
 			logging.info('transfering the AIML archive')
 			xmpp.process(block = True)
 		return os.EX_OK
-	
+
 	if arguments.fork:
 		if os.path.isfile(pid_file):
 			if not os.access(pid_file, os.W_OK):
