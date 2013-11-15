@@ -37,7 +37,7 @@ class CassieUserManager(dict):
 			self.filename = kwargs['filename']
 			del kwargs['filename']
 		dict.__init__(self, *args, **kwargs)
-	
+
 	def save(self):
 		pickle.dump(dict((u, ud) for u, ud in self.items() if ud['type'] == 'user'), open(self.filename, 'w'))
 
@@ -51,18 +51,18 @@ class CassieXMPPBotAimlUpdater(sleekxmpp.ClientXMPP):
 		self.register_plugin('xep_0060') # PubSub
 		self.register_plugin('xep_0199') # XMPP Ping
 		self.ssl_version = ssl.PROTOCOL_SSLv3
-		
+
 		self.logger = logging.getLogger('cassie.bot.xmpp.aimls_updater')
 		self.target_bot = target_bot
 		self.aimls_path = aimls_path
 		self.aimls_reloaded = threading.Event()
 		self.add_event_handler("session_start", self.session_start, threaded = True)
 		self.add_event_handler("message", self.message, threaded = True)
-	
+
 	def session_start(self, event):
 		self.send_presence()
 		self.get_roster()
-		
+
 		self.logger.info('taring the AIML directory')
 		tmp_h = tempfile.TemporaryFile()
 		tar_h = tarfile.open(mode = 'w:bz2', fileobj = tmp_h)
@@ -119,7 +119,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		self.add_event_handler("session_start", self.session_start)
 		self.add_event_handler("message", self.message)
 		self.add_event_handler("ibb_stream_start", self.xep_0047_handle_stream, threaded = True)
-		
+
 		self.logger = logging.getLogger('cassie.bot.xmpp')
 		self.brain = CassieAimlBrain(modules)
 		self.brain.verbose(False)
@@ -144,11 +144,11 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		self.logger.info("the AIML kernel contains {:,} categories".format(self.brain.numCategories()))
 		self.job_manager = JobManager(logger_name = 'cassie.bot.xmpp.job_manager')
 		self.job_manager.start()
-		
+
 		self.custom_message_handlers = {}
 		self.custom_message_handler_lock = threading.RLock()
 		self.custom_message_handler_reaper_job_id = None
-		
+
 		self.bot_modules = modules
 		self.command_permissions = {}
 		for command in map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))):
@@ -157,17 +157,17 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			for command in module.commands:
 				self.command_permissions[command] = ADMIN
 		self.command_handler_set_permission('help', 'user')
-		
+
 		for module_name, module in modules.iteritems():
 			plugin_aiml = os.path.join(self.aimls_plugin_path, module_name + '.aiml')
 			if os.path.isfile(plugin_aiml):
 				self.logger.info("loading aiml file for plugin '{0}'".format(module_name))
 				self.brain.learn(plugin_aiml)
 			module.init_bot(self)
-		
+
 		if chat_room:
 			self.authorized_users[chat_room] = {'lvl':USER, 'type':'room'}
-	
+
 	def aiml_set_update(self, fileobj = None, compression = None):
 		"""
 		compression can be gz, bz2 or None
@@ -177,7 +177,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		if not os.access(self.aimls_path, os.R_OK):
 			self.logger.error('invalid permissions to \'' + self.aimls_path + '\'')
 			return None
-		
+
 		number_of_updates = 0
 		all_members = tar_h.getmembers()
 		aiml_members = filter(lambda x: os.path.splitext(x.name)[-1] == '.aiml', all_members)
@@ -187,11 +187,11 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			return None
 		for cur_tar_obj in aiml_members:
 			tar_h.extract(cur_tar_obj, path = self.aimls_path)
-		
+
 		tar_h.close()
 		self.logger.info('successfully extracted ' + str(len(aiml_members)) + ' AIML files')
 		return number_of_updates
-	
+
 	def aiml_set_load(self):
 		aimls_loaded = 0
 		for root, dirs, files in os.walk(self.aimls_path):
@@ -201,7 +201,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 					aimls_loaded += 1
 		self.logger.info('successfully loaded ' + str(aimls_loaded) + ' AIML files into the kernel')
 		return aimls_loaded
-	
+
 	def chat_room_join(self, room, permissions = USER):
 		if room in self.plugin['xep_0045'].getJoinedRooms():
 			return
@@ -209,14 +209,14 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		self.authorized_users[room] = {'lvl':permissions, 'type':'room'}
 		self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait = True)
 		self.logger.info('joined chat room: ' + room)
-	
+
 	def chat_room_leave(self, room):
 		if not room in self.plugin['xep_0045'].getJoinedRooms():
 			return
-		self.plugin['xep_0045'].leaveMUC(room, self.boundjid.use)
+		self.plugin['xep_0045'].leaveMUC(room, self.boundjid.user)
 		self.logger.info('left chat room: ' + room)
 		del self.authorized_users[room]
-	
+
 	def session_start(self, event):
 		self.records['last connect time'] = time.time()
 		self.send_presence()
@@ -230,7 +230,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		for room_name, permissions in rooms_to_rejoin:
 			self.chat_room_leave(room_name)
 			self.chat_room_join(room_name, permissions)
-	
+
 	def message(self, msg):
 		if not len(msg['body']):
 			return
@@ -257,14 +257,14 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			msg.reply('OTR Is Not Supported At This Time.').send()
 			self.logger.debug('received OTR negotiation request from user ' + session_id)
 			return
-		
+
 		if msg['type'] == 'groupchat':
 			message = message.split(' ', 1)
 			if len(message) != 2:
 				return
 			message = message[1]
 			session_id = str(jid.bare)
-		
+
 		with self.custom_message_handler_lock:
 			if session_id in self.custom_message_handlers:
 				expiration = self.custom_message_handlers[session_id]['expiration']
@@ -282,7 +282,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 						response = 'the message handler encountered an error'
 					self.send_message_formatted(jid, response, msg['type'])
 					return
-		
+
 		message_body = message.replace('\'', '').replace('-', '')
 		self.records['message count'] += 1
 		self.brain.setPredicate('client-name', str(jid.user), session_id)
@@ -293,7 +293,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		else:
 			self.records['failed message count'] += 1
 		return
-	
+
 	def send_message_formatted(self, mto, mbody, mtype = None):
 		if not mbody:
 			return
@@ -305,7 +305,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		else:
 			self.send_message(mto, mbody.get_text(), mtype = mtype, mhtml = mbody.get_xhtml())
 		return
-	
+
 	def command_handler_get(self, command, userlvl):
 		if userlvl < self.command_permissions.get(command, ADMIN):
 			return None
@@ -318,7 +318,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 					cmd_handler = module.get_command_handler(command)
 					break
 		return cmd_handler
-	
+
 	def command_handler_set_permission(self, command, userlvl):
 		if isinstance(userlvl, str):
 			userlvl = userlvl.upper()
@@ -328,7 +328,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		if not command in self.command_permissions:
 			raise Exception('can not set permission for unknown command: ' + repr(command))
 		self.command_permissions[command] = userlvl
-	
+
 	def message_command(self, msg):
 		message = msg['body']
 		jid = msg['from']
@@ -364,7 +364,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			for line in tb: self.logger.error(line)
 			self.logger.error(error.__repr__())
 		return
-	
+
 	def cmd_aiml(self, args, jid, is_muc):
 		parser = ArgumentParserLite('aiml', 'control the AIML kernel')
 		parser.add_argument('-u', '--update', dest = 'update', default = None, help = 'update aiml files from URL')
@@ -383,7 +383,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 				self.logger.error('failed to download AIML archive from URL: ' + results['update'])
 				return 'Failed to open the specified URL'
 			self.logger.debug('downloading AIML archive from: ' + results['update'])
-			
+
 			tmp_h = tempfile.TemporaryFile()
 			chksum = hashlib.new('sha1')
 			data = web_h.read()
@@ -391,7 +391,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			tmp_h.write(data)
 			tmp_h.seek(0, 0)
 			self.logger.info('done reading AIML archive, bytes read: ' + str(len(data)) + ' SHA-1 checksum: ' + chksum.hexdigest())
-			
+
 			number_of_updates = self.aiml_set_update(tmp_h)
 			if number_of_updates == None:
 				response += 'Failed to Extract Archive'
@@ -407,7 +407,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			self.logger.info('successfully reset the AIML brain')
 			response += 'Successfully Reset The AIML Brain\n'
 		return response
-	
+
 	def cmd_bot(self, args, jid, is_muc):
 		parser = ArgumentParserLite('bot', 'control the bot')
 		parser.add_argument('-l', '--log', dest = 'loglvl', action = 'store', default = None, help = 'set the bots logging level')
@@ -436,7 +436,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		if results['stop']:
 			self.bot_request_stop()
 		return response
-	
+
 	def cmd_help(self, args, jid, is_muc):
 		user = self.authorized_users[jid.bare]
 		user_lvl = user['lvl']
@@ -454,12 +454,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			commands.remove('help')
 		response += '\n'.join(commands)
 		return response
-	
+
 	def cmd_info(self, args, jid, is_muc):
 		MINUTE = 60
 		HOUR = 60 * MINUTE
 		DAY = 24 * HOUR
-		
+
 		now = int(time.time())
 		response = 'Cassie Information:\n'
 		response += '== General Information ==\n'
@@ -475,7 +475,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			response += 'Loaded Modules:'
 			response += '\n    ' + "\n    ".join(self.bot_modules.keys())
 			response += '\n'
-		
+
 		response += '\n== Uptime Information ==\n'
 		response += 'Core Initialization Time: ' + time.asctime(time.localtime(self.records['init time'])) + '\n'
 		then = int(self.records['init time'])
@@ -484,7 +484,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		minutes = (((now - then) % DAY) % HOUR) / MINUTE
 		seconds = (((now - then) % DAY) % HOUR) % MINUTE
 		response += "Core Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
-		
+
 		response += 'Last AIML Brain Initialization Time: ' + time.asctime(time.localtime(self.records['brain init time'])) + '\n'
 		then = int(self.records['brain init time'])
 		days = (now - then) / DAY
@@ -492,7 +492,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		minutes = (((now - then) % DAY) % HOUR) / MINUTE
 		seconds = (((now - then) % DAY) % HOUR) % MINUTE
 		response += "AIML Brain Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
-		
+
 		response += 'Last XMPP Connect Time: ' + time.asctime(time.localtime(self.records['last connect time'])) + '\n'
 		then = int(self.records['last connect time'])
 		days = (now - then) / DAY
@@ -501,7 +501,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		seconds = (((now - then) % DAY) % HOUR) % MINUTE
 		response += "XMPP Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
 		return response[:-1]
-	
+
 	def cmd_user(self, args, jid, is_muc):
 		parser = ArgumentParserLite('user', 'add/delete/modify users')
 		parser.add_argument('-a', '--add', dest = 'add user', action = 'store', default = None, help = 'add user')
@@ -547,7 +547,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		except:
 			response += 'Failed To Save User Database'
 		return response
-	
+
 	def custom_message_handler_add(self, jid, callback, expiration, reset_expiration = True):
 		jid = str(jid)
 		handler_id = None
@@ -571,7 +571,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		elif not self.job_manager.job_exists(self.custom_message_handler_reaper_job_id):
 			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes = 3)
 		return handler_id
-	
+
 	def custom_message_handler_exists(self, jid = None, handler_id = None):
 		if not (bool(jid) ^ bool(handler_id)):
 			raise Exception('specify either jid or handler_id')
@@ -586,7 +586,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 					if handler['handler_id'] == handler_id:
 						return True
 		return False
-	
+
 	def custom_message_handler_del(self, jid = None, handler_id = None, safe = False):
 		if not (bool(jid) ^ bool(handler_id)):
 			raise Exception('specify either jid or handler_id')
@@ -609,7 +609,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			self.logger.info('the specified custom message handler does not exist')
 			return
 		raise Exception('the specified custom message handler does not exist')
-	
+
 	def custom_message_handler_reaper(self):
 		with self.custom_message_handler_lock:
 			handlers_for_removal = []
@@ -623,10 +623,10 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 				self.custom_message_handler_reaper_job_id = None
 				return JobRequestDelete()
 		return None
-	
+
 	def bot_run(self):
 		self.process(block = True)
-	
+
 	def bot_request_stop(self, signum = None, frame = None):
 		if signum == None:
 			self.logger.warning('received shutdown command, proceeding to stop')
@@ -647,7 +647,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			self.logger.error('failed to dump authorized users to file on clean up')
 		self.job_manager.stop()
 		sys.exit(1)
-	
+
 	def xep_0047_accept_stream(self, msg):
 		try:
 			for i in range(1):
@@ -664,14 +664,14 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		except:
 			self.logger.error('an error occured while accepting an IBB stream, it was rejected')
 			return False
-	
+
 	def xep_0047_handle_stream(self, stream):
 		self.logger.info('stream opened: ' + stream.sid + ' from: ' + stream.receiver.bare)
 		tmp_h = tempfile.TemporaryFile()
-		
+
 		chksum = hashlib.new('sha1')
 		size = 0
-		
+
 		data = stream.read()
 		while data:
 			size += len(data)
