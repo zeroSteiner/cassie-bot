@@ -11,6 +11,7 @@ class ArgumentParserLite:
 		self.epilog = '\n'.join(textwrap.wrap((epilog or ''), MAX_WIDTH))
 		self.__arguments__ = {}
 		self.__last_error__ = 'No Error'
+		self.ignore_urls = True
 
 	def format_usage(self):
 		self_arguments = copy.deepcopy(self.__arguments__)
@@ -53,7 +54,7 @@ class ArgumentParserLite:
 			else:
 				arg_string += (' ' * (MAX_ARG_WIDTH - len(arg_string)))
 			help_words = arg_desc['help'].split()
-			
+
 			while len(help_words):
 				word = help_words.pop(0)
 				while (len(arg_string) < MAX_WIDTH) and len(help_words):
@@ -68,7 +69,7 @@ class ArgumentParserLite:
 		if self.epilog:
 			help_text += '\n' + self.epilog
 		return help_text
-	
+
 	def get_last_error(self):
 		tmp = self.__last_error__
 		self.__last_error__ = ''
@@ -84,7 +85,10 @@ class ArgumentParserLite:
 				if arg in ['-h', '--help']:
 					self.__last_error__ = self.format_help()
 					return None
-				self.__last_error__ = 'error: unrecognized argument: ' + str(arg)
+				arg = str(arg)
+				if self.ignore_urls and arg.startswith('<http') and arg.endswith('>'):
+					continue
+				self.__last_error__ = 'error: unrecognized argument: ' + arg
 				return None
 			if last_argument:
 				arg_desc = self_arguments[last_argument]
@@ -107,7 +111,7 @@ class ArgumentParserLite:
 		if last_argument:
 			self.__last_error__ = 'error: argument ' + last_argument + ': expected one argument'
 			return None
-			
+
 		for arg in already_done:
 			del self_arguments[arg]
 		for arg, arg_desc in self_arguments.items():
@@ -128,7 +132,7 @@ class ArgumentParserLite:
 		if not 'type' in kwargs: kwargs['type'] = str
 		if not 'dest' in kwargs: raise Exception('dest must be defined')
 		kwargs['__aliases__'] = args
-		
+
 		# defaults have been set, now sanitize
 		for name in args:
 			if not ((len(name) == 2) and name[0] == '-') and not ((len(name) > 2) and (name[0:2] == '--')):
