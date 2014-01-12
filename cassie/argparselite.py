@@ -10,6 +10,7 @@ class ArgumentParserLite:
 		self.description = '\n'.join(textwrap.wrap((description or ''), MAX_WIDTH))
 		self.epilog = '\n'.join(textwrap.wrap((epilog or ''), MAX_WIDTH))
 		self.__arguments__ = {}
+		self.__positionals__ = []
 		self.__last_error__ = 'No Error'
 		self.ignore_urls = True
 
@@ -17,7 +18,9 @@ class ArgumentParserLite:
 		self_arguments = copy.deepcopy(self.__arguments__)
 		usage = 'usage: ' + self.prog
 		args = self_arguments.keys()
+		args = filter(lambda arg: arg.startswith('-'), args)
 		args.sort()
+		args.extend(self.__positionals__)
 		for arg in args:
 			if not arg in self_arguments:
 				continue
@@ -26,6 +29,8 @@ class ArgumentParserLite:
 				usage += '\n' + (' ' * len('usage: ' + self.prog))
 			if arg_desc['action'] != 'store':
 				usage += ' [' + arg + ']'
+			elif arg_desc['dest'] == arg:
+				usage += ' [' + arg.upper() + ']'
 			else:
 				usage += ' [' + arg + ' ' + arg_desc['dest'].upper() + ']'
 			for arg in arg_desc['__aliases__']:
@@ -39,7 +44,9 @@ class ArgumentParserLite:
 			help_text += self.description + '\n\n'
 		help_text += 'arguments:\n'
 		args = self_arguments.keys()
+		args = filter(lambda arg: arg.startswith('-'), args)
 		args.sort()
+		args.extend(self.__positionals__)
 		for arg in args:
 			if not arg in self_arguments:
 				continue
@@ -81,15 +88,17 @@ class ArgumentParserLite:
 		self_arguments = copy.deepcopy(self.__arguments__)
 		results = {}
 		for arg in args:
-			if not arg in self_arguments and last_argument == None:
+			if last_argument == None and not arg in self_arguments:
 				if arg in ['-h', '--help']:
 					self.__last_error__ = self.format_help()
 					return None
 				arg = str(arg)
 				if self.ignore_urls and arg.startswith('<http') and arg.endswith('>'):
 					continue
-				self.__last_error__ = 'error: unrecognized argument: ' + arg
-				return None
+				if len(self.__positionals__) == 0:
+					self.__last_error__ = 'error: unrecognized argument: ' + arg
+					return None
+				last_argument = self.__positionals__.pop(0)
 			if last_argument:
 				arg_desc = self_arguments[last_argument]
 				try:
@@ -130,13 +139,25 @@ class ArgumentParserLite:
 		if not 'required' in kwargs: kwargs['required'] = False
 		if not 'help' in kwargs: kwargs['help'] = ''
 		if not 'type' in kwargs: kwargs['type'] = str
-		if not 'dest' in kwargs: raise Exception('dest must be defined')
 		kwargs['__aliases__'] = args
 
 		# defaults have been set, now sanitize
-		for name in args:
-			if not ((len(name) == 2) and name[0] == '-') and not ((len(name) > 2) and (name[0:2] == '--')):
-				raise ValueError('arguments must be formated as -x or --xxx')
+		if len(args) == 1 and not args[0].startswith('-'):
+			name = args[0]
+			if name in self.__positionals__:
+				raise ValueError('duplicate positional argument')
+			if not kwargs['required']:
+				raise ValueError('positional arguments must be required')
+			if 'dest' in kwargs:
+				raise Exception('dest can not be specified for positional arguments')
+			kwargs['dest'] = name
+			self.__positionals__.append(name)
+		else:
+			if not 'dest' in kwargs: raise Exception('dest must be defined')
+			for name in args:
+				if not ((len(name) == 2) and name[0] == '-') and not ((len(name) > 2) and (name[0:2] == '--')):
+					raise ValueError('arguments must be formated as -x or --xxx')
+
 		if kwargs['action'] not in ['store', 'store_true', 'store_false']:
 			raise ValueError('invalid action: ' + kwargs['action'])
 		if not type(kwargs['type']) == type:
