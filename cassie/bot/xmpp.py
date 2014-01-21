@@ -356,8 +356,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			msg.reply('Command Not Found').send()
 			return
 		try:
-			self.send_message_formatted(jid, response, msg['type'])
 			response = cmd_handler(arguments, jid, (msg['type'] == 'groupchat'))
+			self.send_message_formatted(jid, response, msg['type'])
 			return
 		except CassieCommandError as error:
 			self.logger.warning('command error command: ' + command + ' for user ' + jid.bare)
