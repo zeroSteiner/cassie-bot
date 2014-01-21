@@ -22,8 +22,6 @@ class Module(CassieXMPPBotModule):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		if results['single']:
 			return self.assemble_line(results['single'])
 		elif results['interactive']:

@@ -16,13 +16,16 @@ import tempfile
 import sleekxmpp
 import threading
 import traceback
-from sleekxmpp.xmlstream import ET
+
 from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
+from cassie.errors import *
 from cassie.job import JobManager, JobRequestDelete
 from cassie.imcontent import IMContentText, IMContentMarkdown
 from cassie.templates import CassieGenericBot
 from cassie import __version__
+
+from sleekxmpp.xmlstream import ET
 
 GUEST = 0
 USER = 1
@@ -353,9 +356,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 			msg.reply('Command Not Found').send()
 			return
 		try:
-			response = cmd_handler(arguments, jid, (msg['type'] == 'groupchat'))
 			self.send_message_formatted(jid, response, msg['type'])
+			response = cmd_handler(arguments, jid, (msg['type'] == 'groupchat'))
 			return
+		except CassieCommandError as error:
+			self.logger.warning('command error command: ' + command + ' for user ' + jid.bare)
+			self.send_message_formatted(jid, error.message, msg['type'])
 		except Exception as error:
 			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
 			self.logger.error('failed to execute command: ' + command + ' for user ' + jid.bare)
@@ -373,8 +379,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		response = ''
 		if results['update']:
 			try:
@@ -417,8 +421,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		response = ''
 		if results['loglvl']:
 			results['loglvl'] = results['loglvl'].upper()
@@ -511,8 +513,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP, CassieGenericBot):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		response = ''
 		if not results['permissions'].upper() in USER_LVL_NAME_TO_INT:
 			return 'Invalid privilege level'

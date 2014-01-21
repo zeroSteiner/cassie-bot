@@ -51,8 +51,6 @@ class Module(CassieXMPPBotModule):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		response = []
 		if results['enable'] and results['disable']:
 			return 'please select either enable or disable'

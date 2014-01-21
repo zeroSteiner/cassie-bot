@@ -1,6 +1,8 @@
 import copy
 import textwrap
 
+from cassie.errors import CassieCommandError
+
 MAX_WIDTH = 60
 MAX_ARG_WIDTH = 24
 
@@ -11,7 +13,6 @@ class ArgumentParserLite:
 		self.epilog = '\n'.join(textwrap.wrap((epilog or ''), MAX_WIDTH))
 		self.__arguments__ = {}
 		self.__positionals__ = []
-		self.__last_error__ = 'No Error'
 		self.ignore_urls = True
 
 	def format_usage(self):
@@ -77,12 +78,7 @@ class ArgumentParserLite:
 			help_text += '\n' + self.epilog
 		return help_text
 
-	def get_last_error(self):
-		tmp = self.__last_error__
-		self.__last_error__ = ''
-		return tmp
-
-	def parse_args(self, args):
+	def parse_args(self, args, raise_exception = True):
 		already_done = []
 		last_argument = None
 		self_arguments = copy.deepcopy(self.__arguments__)
@@ -90,22 +86,19 @@ class ArgumentParserLite:
 		for arg in args:
 			if last_argument == None and not arg in self_arguments:
 				if arg in ['-h', '--help']:
-					self.__last_error__ = self.format_help()
-					return None
+					raise CassieCommandError(self.format_help())
 				arg = str(arg)
 				if self.ignore_urls and arg.startswith('<http') and arg.endswith('>'):
 					continue
 				if len(self.__positionals__) == 0:
-					self.__last_error__ = 'error: unrecognized argument: ' + arg
-					return None
+					raise CassieCommandError('error: unrecognized argument: ' + arg)
 				last_argument = self.__positionals__.pop(0)
 			if last_argument:
 				arg_desc = self_arguments[last_argument]
 				try:
 					results[arg_desc['dest']] = arg_desc['type'](arg)
 				except:
-					self.__last_error__ = 'error: argument ' + str(last_argument) + ': invalid ' + repr(arg_desc['type'])[7:-2] + ' value: \'' + arg + '\''
-					return None
+					raise CassieCommandError('error: argument ' + str(last_argument) + ': invalid ' + repr(arg_desc['type'])[7:-2] + ' value: \'' + arg + '\'')
 				last_argument = None
 				continue
 			else:
@@ -118,8 +111,7 @@ class ArgumentParserLite:
 				last_argument = arg
 			already_done.append(arg)
 		if last_argument:
-			self.__last_error__ = 'error: argument ' + last_argument + ': expected one argument'
-			return None
+			raise CassieCommandError('error: argument ' + last_argument + ': expected one argument')
 
 		for arg in already_done:
 			del self_arguments[arg]
@@ -127,8 +119,7 @@ class ArgumentParserLite:
 			if arg_desc['dest'] in results:
 				continue
 			if arg_desc['required']:
-				self.__last_error__ = 'error: missing argument: ' + str(arg)
-				return None
+				raise CassieCommandError('error: missing argument: ' + str(arg))
 			else:
 				results[arg_desc['dest']] = arg_desc['default']
 		return results

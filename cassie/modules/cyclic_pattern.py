@@ -40,8 +40,6 @@ class Module(CassieXMPPBotModule):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		if not bool(len(filter(lambda x: x != None, results))):
 			return parser.format_help()
 

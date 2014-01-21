@@ -14,8 +14,6 @@ class Module(CassieXMPPBotModule):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 
 		data = json.dumps({'longUrl':results['url']})
 		request = urllib2.Request('https://www.googleapis.com/urlshortener/v1/url', data, {'Content-Type':'application/json'})

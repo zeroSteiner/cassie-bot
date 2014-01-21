@@ -118,8 +118,6 @@ class Module(CassieXMPPBotModule):
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not results:
-			return parser.get_last_error()
 		user = str(jid.bare)
 
 		if results['list_games']:
