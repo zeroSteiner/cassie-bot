@@ -39,7 +39,7 @@ class Frotz(object):
 		settings = termios.tcgetattr(frotz_out_pty[0])
 		settings[3] = settings[3] & ~termios.ECHO
 		termios.tcsetattr(frotz_out_pty[0], termios.TCSADRAIN, settings)
-		
+
 		self.frotz_proc = subprocess.Popen(command, stdin = frotz_out_pty[1], stdout = frotz_out_pty[1], stderr = subprocess.PIPE, bufsize = 0)
 		self.frotz_stdin = os.fdopen(frotz_out_pty[0], 'wrb', 0)
 		self.frotz_stdout = self.frotz_stdin

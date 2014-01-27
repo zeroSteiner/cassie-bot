@@ -49,7 +49,7 @@ class Module(CassieXMPPBotModule):
 		pattern = createCyclicPattern(size)
 		if results['pattern'] == None:
 			if results['code']:
-				code = "# Cyclic Pattern Length: {0}\n".format(len(pattern)) 
+				code = "# Cyclic Pattern Length: {0}\n".format(len(pattern))
 				code += "pattern  = \"\"\n"
 				for idx in range(0, len(pattern), 32):
 					code += "pattern += \"{0}\"\n".format(pattern[idx:idx + 32])

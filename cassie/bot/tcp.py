@@ -15,7 +15,7 @@ class CassieSocketRequestHandler(SocketServer.BaseRequestHandler):
 					self.request.send(response + '\n')
 		except:
 			pass
-		
+
 class CassieTCPBot(SocketServer.ThreadingMixIn, SocketServer.TCPServer, CassieGenericBot):
 	def __init__(self, bindinfo, aimls_path, botmaster, prompt):
 		__shutdown__ = False

@@ -11,7 +11,7 @@ host: 127.0.0.1
 port: 9091
 use_ssl: true
 secret: blahblah
-default_groups: 
+default_groups:
 """
 
 # http://www.igniterealtime.org/projects/openfire/plugins/userservice/readme.html
@@ -23,18 +23,18 @@ class Module(CassieXMPPBotModule):
 		params['secret'] = self.options['secret']
 		params['username'] = username
 		return params
-	
+
 	def process_request(self, params):
 		scheme = 'http'
 		if self.options['use_ssl']:
 			scheme += 's'
 		uri = "{scheme}://{host}:{port}{path}?{query}"
 		uri = uri.format(scheme = scheme, host = self.options['host'], port = self.options['port'], path = USER_SERVICE_PATH, query = urlencode(params))
-		
+
 		response = urllib2.urlopen(uri).read()
 		response = response.strip()
 		response = ET.fromstring(response)
-		
+
 		tag = response.tag.lower()
 		text = response.text.lower()
 		if tag == 'result' and text == 'ok':
@@ -43,7 +43,7 @@ class Module(CassieXMPPBotModule):
 			return 'Error \'' + response.text + '\' occurred'
 		else:
 			return 'An unknown error occurred'
-	
+
 	def cmd_openfire(self, args, jid, is_muc):
 		parser = ArgumentParserLite('openfire', 'manager users on openfire')
 		parser.add_argument('-a', '--add', dest = 'add_user', default = None, help = 'username to add')
@@ -71,7 +71,7 @@ class Module(CassieXMPPBotModule):
 		else:
 			return 'Must select either add, delete, enable or disable'
 		return self.process_request(params)
-	
+
 	def config_parser(self, config):
 		self.options['host'] = config.get('host')
 		self.options['port'] = config.getint('port')
