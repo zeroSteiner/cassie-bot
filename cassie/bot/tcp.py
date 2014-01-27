@@ -1,6 +1,7 @@
-import os
 import logging
+import os
 import SocketServer
+
 from cassie.brain import Brain as CassieAimlBrain
 from cassie.templates import CassieGenericBot
 

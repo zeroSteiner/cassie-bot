@@ -1,21 +1,19 @@
-import os
-import ssl
-import sys
-import aiml
-import time
-import uuid
-import shlex
-import pickle
-import signal
+import datetime
 import hashlib
 import logging
+import os
+import pickle
+import shlex
+import signal
+import ssl
+import sys
 import tarfile
-import urllib2
-import datetime
 import tempfile
-import sleekxmpp
 import threading
+import time
 import traceback
+import urllib2
+import uuid
 
 from cassie.argparselite import ArgumentParserLite
 from cassie.brain import Brain as CassieAimlBrain
@@ -25,6 +23,8 @@ from cassie.imcontent import IMContentText, IMContentMarkdown
 from cassie.templates import CassieGenericBot
 from cassie import __version__
 
+import aiml
+import sleekxmpp
 from sleekxmpp.xmlstream import ET
 
 GUEST = 0

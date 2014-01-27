@@ -1,5 +1,6 @@
-import aiml
 import types
+
+import aiml
 
 class Brain(object, aiml.Kernel):
 	def __init__(self, modules, *args, **kwargs):

@@ -1,8 +1,8 @@
+import datetime
+import logging
+import threading
 import time
 import uuid
-import logging
-import datetime
-import threading
 
 __version__ = '0.1'
 __all__ = ['JobRun', 'JobManager']

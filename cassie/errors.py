@@ -1,4 +1,3 @@
-
 class CassieError(Exception):
 	pass
 
