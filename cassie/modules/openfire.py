@@ -1,6 +1,7 @@
-import urllib2
 from urllib import urlencode
+import urllib2
 import xml.etree.ElementTree as ET
+
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
 

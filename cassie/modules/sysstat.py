@@ -1,6 +1,7 @@
-import psutil
-from cassie.utils import generate_progress_bar
 from cassie.templates import CassieXMPPBotModule
+from cassie.utils import generate_progress_bar
+
+import psutil
 
 class Module(CassieXMPPBotModule):
 	def cmd_sysstat(self, args, jid, is_muc):

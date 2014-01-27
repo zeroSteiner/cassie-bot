@@ -1,8 +1,8 @@
-from mayhem.pyasm.assembler import Assembler
-from mayhem.pyasm.exceptions import AssemblyError, AssemblySyntaxError
-
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
+
+from mayhem.pyasm.assembler import Assembler
+from mayhem.pyasm.exceptions import AssemblyError, AssemblySyntaxError
 
 """
 # Example config:

@@ -1,9 +1,9 @@
 import os
 import pty
 import select
+import subprocess
 import termios
 import threading
-import subprocess
 
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule

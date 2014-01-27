@@ -1,5 +1,6 @@
 import json
 import urllib2
+
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
 

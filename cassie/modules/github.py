@@ -1,10 +1,11 @@
+import collections
+import datetime
 import json
 import urllib2
-import datetime
-import collections
+
 from cassie.argparselite import ArgumentParserLite
-from cassie.templates import CassieXMPPBotModule
 from cassie.imcontent import IMContentMarkdown
+from cassie.templates import CassieXMPPBotModule
 
 """
 # Example config:
