@@ -47,24 +47,26 @@ class Module(CassieXMPPBotModule):
 
 	def cmd_github(self, args, jid, is_muc):
 		parser = ArgumentParserLite('github', 'monitor new commits and pull requests to a github repository')
-		parser.add_argument('--enable', dest = 'enable', action = 'store_true', default = None, help = 'enable this service')
-		parser.add_argument('--disable', dest = 'disable', action = 'store_true', default = None, help = 'disable this service')
+		parser.add_argument('action', required = True, help = 'github plugin action (disable, enable, status)')
 		if not len(args):
-			return parser.format_help()
-		results = parser.parse_args(args)
+			action = 'status'
+		else:
+			results = parser.parse_args(args)
+			action = results['action']
+			if not action in ['disable', 'enable', 'status']:
+				return 'action must be either disable, enable or status'
 		response = []
-		if results['enable'] and results['disable']:
-			return 'please select either enable or disable'
-		elif results['enable'] != True and results['disable'] != True:
-			return 'please select either enable or disable'
 		job_manager = self.bot.job_manager
 		if not job_manager.job_exists(self.job_id):
 			self.job_start_time = datetime.datetime.utcnow()
 			self.job_id = job_manager.job_add(self.check_github_repo_activity, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
-		if results['enable']:
+		if action == 'status':
+			status = job_manager.job_is_enabled(self.job_id)
+			response.append("github repository is {0}running".format(('' if status else 'not '))) 
+		elif action == 'enable':
 			job_manager.job_enable(self.job_id)
 			response.append('enabled the github repository monitor')
-		elif results['disable']:
+		elif action == 'disable':
 			job_manager.job_disable(self.job_id)
 			response.append('disabled the github repository monitor')
 		return '\n'.join(response)

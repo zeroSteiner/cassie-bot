@@ -192,3 +192,8 @@ class JobManager(threading.Thread):
 			return True
 		else:
 			return False
+
+	def job_is_enabled(self, job_id):
+		job_id = normalize_job_id(job_id)
+		job_desc = self.__jobs__[job_id]
+		return job_desc['enabled']
