@@ -6,7 +6,11 @@ from cassie.errors import CassieCommandError
 MAX_WIDTH = 60
 MAX_ARG_WIDTH = 24
 
-class ArgumentParserLite:
+class ArgumentContainer(dict, object):
+	def __getattr__(self, name):
+		return self.__getitem__(name)
+
+class ArgumentParserLite(object):
 	def __init__(self, prog = '', description = None, epilog = None):
 		self.prog = prog
 		self.description = '\n'.join(textwrap.wrap((description or ''), MAX_WIDTH))
@@ -82,7 +86,7 @@ class ArgumentParserLite:
 		already_done = []
 		last_argument = None
 		self_arguments = copy.deepcopy(self.__arguments__)
-		results = {}
+		results = ArgumentContainer()
 		for arg in args:
 			if last_argument == None and not arg in self_arguments:
 				if arg in ['-h', '--help']:
