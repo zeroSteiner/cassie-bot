@@ -58,7 +58,10 @@ class ArgumentParserLite(object):
 			arg_desc = self_arguments[arg]
 			arg_string = ' ' + ', '.join(arg_desc['__aliases__'])
 			if arg_desc['action'] == 'store':
-				arg_string += ' ' + arg_desc['dest'].upper()
+				if not arg_desc['choices']:
+					arg_string += ' ' + arg_desc['dest'].upper()
+				else:
+					arg_string += ' (' + ','.join(map(str, arg_desc['choices'])) + ')'
 			arg_string += ' '
 			if len(arg_string) > MAX_ARG_WIDTH:
 				help_text += arg_string + '\n'
@@ -100,9 +103,12 @@ class ArgumentParserLite(object):
 			if last_argument:
 				arg_desc = self_arguments[last_argument]
 				try:
-					results[arg_desc['dest']] = arg_desc['type'](arg)
+					typed_arg = arg_desc['type'](arg)
 				except:
-					raise CassieCommandError('error: argument ' + str(last_argument) + ': invalid ' + repr(arg_desc['type'])[7:-2] + ' value: \'' + arg + '\'')
+					raise CassieCommandError('error: argument ' + str(last_argument) + ': invalid ' + repr(arg_desc['type'])[7:-2] + ' value: ' + repr(arg))
+				if arg_desc['choices'] and not typed_arg in arg_desc['choices']:
+					raise CassieCommandError('error: argument ' + str(last_argument) + ': invalid choice: ' + repr(typed_arg) + ' (acceptable values: ' + ', '.join(map(repr, arg_desc['choices'])) + ')')
+				results[arg_desc['dest']] = typed_arg
 				last_argument = None
 				continue
 			else:
@@ -134,6 +140,7 @@ class ArgumentParserLite(object):
 		if not 'required' in kwargs: kwargs['required'] = False
 		if not 'help' in kwargs: kwargs['help'] = ''
 		if not 'type' in kwargs: kwargs['type'] = str
+		if not 'choices' in kwargs: kwargs['choices'] = None
 		kwargs['__aliases__'] = args
 
 		# defaults have been set, now sanitize
