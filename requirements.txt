@@ -1,0 +1,2 @@
+Markdown>=2.3.1
+sleekxmpp>=1.2.0
