@@ -10,7 +10,6 @@ cassie_dir: /opt/cassie-bot
 log_file: %(cassie_dir)s/cassie_log.txt
 pid_file: /var/run/cassie.pid
 setuid: 65534
-mode: xmpp
 
 [xmpp]
 jid: cassie@server/cassiebot

@@ -6,9 +6,9 @@ import logging
 import getpass
 from argparse import ArgumentParser
 from ConfigParser import ConfigParser, NoOptionError
+
 from cassie.utils import set_proc_name, SectionConfigParser
 from cassie.bot.xmpp import CassieXMPPBot, CassieXMPPBotAimlUpdater
-from cassie.bot.tcp import CassieTCPBot
 from cassie import __version__
 
 PROMPT = 'cassie > '
@@ -24,13 +24,13 @@ else:
 	raw_input = input
 
 def main():
-	parser = ArgumentParser(description = 'Cassie: Chat Bot For Offensive Security Testing', conflict_handler = 'resolve')
-	parser.add_argument('-c', '--config', dest = 'config_path', action = 'store', default = 'cassie.conf', help = 'path to the configuration file')
-	parser.add_argument('-f', '--foreground', dest = 'fork', action = 'store_false', default = True, help = 'run in foreground/do not fork a new process')
-	parser.add_argument('-u', '--update', dest = 'update', action = 'store_true', default = False, help = 'log in and update the currently loaded AIML set')
-	parser.add_argument('-l', '--local', dest = 'local', action = 'store_true', default = False, help = 'start a local AIML interpreter prompt')
-	parser.add_argument('-v', '--version', action = 'version', version = parser.prog + ' Version: ' + __version__)
-	parser.add_argument('-L', '--log', dest = 'loglvl', action = 'store', choices = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default = 'WARNING', help = 'set the logging level')
+	parser = ArgumentParser(description='Cassie: Chat Bot For Offensive Security Testing', conflict_handler='resolve')
+	parser.add_argument('-c', '--config', dest='config_path', action='store', default='cassie.conf', help='path to the configuration file')
+	parser.add_argument('-f', '--foreground', dest='fork', action='store_false', default=True, help='run in foreground/do not fork a new process')
+	parser.add_argument('-u', '--update', dest='update', action='store_true', default=False, help='log in and update the currently loaded AIML set')
+	parser.add_argument('-l', '--local', dest='local', action='store_true', default=False, help='start a local AIML interpreter prompt')
+	parser.add_argument('-v', '--version', action='version', version=parser.prog + ' Version: ' + __version__)
+	parser.add_argument('-L', '--log', dest='loglvl', action='store', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='WARNING', help='set the logging level')
 	parser.epilog = 'If no configuration file is specified cassie.conf will be used.'
 	arguments = parser.parse_args()
 
@@ -42,24 +42,18 @@ def main():
 		if config.has_option('core', 'setuid'):
 			settings['core_setuid'] = config.getint('core', 'setuid')
 		pid_file = config.get('core', 'pid_file')
-		settings['core_mode'] = config.get('core', 'mode').lower()
 		settings['aiml_path'] = config.get('aiml', 'path')
 		settings['aiml_plugin_path'] = config.get('aiml', 'plugin_path')
 		settings['aiml_botmaster'] = config.get('aiml', 'botmaster')
 
-		if config.has_section('xmpp'):
-			settings['xmpp_jid'] = config.get('xmpp', 'jid')
-			settings['xmpp_password'] = config.get('xmpp', 'password')
-			settings['xmpp_server'] = config.get('xmpp', 'server')
-			settings['xmpp_port'] = config.getint('xmpp', 'port')
-			settings['xmpp_admin'] = config.get('xmpp', 'admin')
-			settings['xmpp_users_file'] = config.get('xmpp', 'users_file')
-			if config.has_option('xmpp', 'chat_room'):
-				settings['xmpp_chat_room'] = config.get('xmpp', 'chat_room')
-
-		if config.has_section('tcpserver'):
-			settings['tcpsrv_server'] = config.get('tcpserver', 'server')
-			settings['tcpsrv_port'] = config.getint('tcpserver', 'port')
+		settings['xmpp_jid'] = config.get('xmpp', 'jid')
+		settings['xmpp_password'] = config.get('xmpp', 'password')
+		settings['xmpp_server'] = config.get('xmpp', 'server')
+		settings['xmpp_port'] = config.getint('xmpp', 'port')
+		settings['xmpp_admin'] = config.get('xmpp', 'admin')
+		settings['xmpp_users_file'] = config.get('xmpp', 'users_file')
+		if config.has_option('xmpp', 'chat_room'):
+			settings['xmpp_chat_room'] = config.get('xmpp', 'chat_room')
 
 	except NoOptionError as err:
 		print 'Could Not Validate Option: \'' + err.option + '\' From Config File.'
@@ -69,7 +63,7 @@ def main():
 		return os.EX_CONFIG
 
 	# configure logging
-	logging.basicConfig(filename = settings['core_log_file'], level = getattr(logging, arguments.loglvl), format = "%(name)-45s %(levelname)-10s %(asctime)s %(message)s")
+	logging.basicConfig(filename=settings['core_log_file'], level=getattr(logging, arguments.loglvl), format="%(name)-45s %(levelname)-10s %(asctime)s %(message)s")
 	logger = logging.getLogger('cassie.main')
 
 	if arguments.local or not arguments.fork or arguments.update:
@@ -77,27 +71,26 @@ def main():
 		console.setFormatter(logging.Formatter("%(levelname)-10s %(message)s"))
 		logging.getLogger('').addHandler(console)
 
-	if settings['core_mode'] == 'xmpp':
-		modules = {}
-		try:
-			module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
-			for module_name in module_sections:
-				module_name = module_name[4:]
-				logger.info('loading xmpp module: ' + module_name)
-				try:
-					module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
-					module_instance = module.Module()
-				except Exception as err:
-					logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__)
-					continue
-				module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
-				modules[module_name] = module_instance
-		except NoOptionError as err:
-			print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
-			return os.EX_CONFIG
-		except ValueError as err:
-			print 'Invalid Option ' + err.message + ' From Config File.'
-			return os.EX_CONFIG
+	modules = {}
+	try:
+		module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
+		for module_name in module_sections:
+			module_name = module_name[4:]
+			logger.info('loading xmpp module: ' + module_name)
+			try:
+				module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
+				module_instance = module.Module()
+			except Exception as err:
+				logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__)
+				continue
+			module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
+			modules[module_name] = module_instance
+	except NoOptionError as err:
+		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
+		return os.EX_CONFIG
+	except ValueError as err:
+		print 'Invalid Option ' + err.message + ' From Config File.'
+		return os.EX_CONFIG
 
 	if arguments.local:
 		from cassie.brain import Brain
@@ -132,7 +125,7 @@ def main():
 		logging.info('connecting to the server to initiate an AIML update')
 		if xmpp.connect((settings['xmpp_server'], settings['xmpp_port'])):
 			logging.info('transfering the AIML archive')
-			xmpp.process(block = True)
+			xmpp.process(block=True)
 		return os.EX_OK
 
 	if arguments.fork:
@@ -153,21 +146,17 @@ def main():
 				logger.error('could not write to PID file: ' + pid_file)
 			return os.EX_OK
 
-	if settings['core_mode'] == 'xmpp':
-		cassie_bot = CassieXMPPBot(
-			settings['xmpp_jid'],
-			settings['xmpp_password'],
-			settings['xmpp_admin'],
-			settings['xmpp_users_file'],
-			settings['aiml_path'],
-			settings['aiml_plugin_path'],
-			settings['aiml_botmaster'],
-			modules,
-			settings.get('xmpp_chat_room')
-		)
-	elif settings['core_mode'] == 'tcpserver':
-		server_address = (settings['tcpsrv_server'], settings['tcpsrv_port'])
-		cassie_bot = CassieTCPBot(server_address, settings['aiml_path'], settings['aiml_botmaster'], PROMPT)
+	cassie_bot = CassieXMPPBot(
+		settings['xmpp_jid'],
+		settings['xmpp_password'],
+		settings['xmpp_admin'],
+		settings['xmpp_users_file'],
+		settings['aiml_path'],
+		settings['aiml_plugin_path'],
+		settings['aiml_botmaster'],
+		modules,
+		settings.get('xmpp_chat_room')
+	)
 
 	if settings.get('core_setuid'):
 		if os.getuid() == 0:
@@ -181,10 +170,9 @@ def main():
 		elif os.getuid() != 0:
 			logger.error('cannot setuid when not executed as root')
 
-	if settings['core_mode'] == 'xmpp':
-		if not cassie_bot.connect((settings['xmpp_server'], settings['xmpp_port'])):
-			logger.error('connecting to the remote xmpp server failed')
-			return os.EX_UNAVAILABLE
+	if not cassie_bot.connect((settings['xmpp_server'], settings['xmpp_port'])):
+		logger.error('connecting to the remote xmpp server failed')
+		return os.EX_UNAVAILABLE
 
 	signal.signal(signal.SIGTERM, cassie_bot.bot_request_stop)
 	signal.signal(signal.SIGINT, cassie_bot.bot_request_stop)
