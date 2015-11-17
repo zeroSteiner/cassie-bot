@@ -1,19 +1,17 @@
 import logging
+import os
 
 class CassieXMPPBotModule(object):
 	def __init__(self):
 		self.options = {}
 		self.bot = None
-		self.brain = None
+		self.name = self.__class__.__module__.split('.')[-1]
 
 	def init_bot(self, bot):
 		self.bot = bot
 
-	def init_brain(self, brain):
-		self.brain = brain
-
-	def config_parser(self, config):
-		return self.options
+	def update_options(self, options):
+		self.options.update(options)
 
 	def has_command(self, command):
 		return hasattr(self, 'cmd_' + command)

@@ -3,7 +3,6 @@ import datetime
 import hashlib
 import logging
 import os
-import pickle
 import shlex
 import signal
 import ssl
@@ -11,7 +10,6 @@ import sys
 import tempfile
 import threading
 import time
-import traceback
 import uuid
 
 from cassie import __version__
@@ -24,7 +22,7 @@ import sleekxmpp
 from smoke_zephyr.job import JobManager, JobRequestDelete
 
 class CassieXMPPBot(sleekxmpp.ClientXMPP):
-	def __init__(self, jid, password, admin, users_file, botmaster, modules=None):
+	def __init__(self, jid, password, admin, users_file, modules=None):
 		self.__shutdown__ = False
 		sleekxmpp.ClientXMPP.__init__(self, jid, password)
 		self.register_plugin('xep_0004')  # data forms
@@ -57,24 +55,16 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 
 		self.bot_modules = modules or []
 		self.command_permissions = collections.defaultdict(lambda: users.LVL_ADMIN)
-		#self.command_handler_set_permission('help', 'user')
-
-		#for module_name, module in modules.iteritems():
-		#	plugin_aiml = os.path.join(self.aimls_plugin_path, module_name + '.aiml')
-		#	if os.path.isfile(plugin_aiml):
-		#		self.logger.info("loading aiml file for plugin '{0}'".format(module_name))
-		#	module.init_bot(self)
-
-		#if chat_room:
-		#	self.authorized_users[chat_room] = users.Room(chat_room)
+		self.command_handler_set_permission('help', 'user')
 
 	def chat_room_join(self, room, permissions=users.LVL_ROOM):
 		if room in self.plugin['xep_0045'].getJoinedRooms():
 			return
 		# rooms are technically authorized users
 		self.authorized_users[room] = users.Room(room, permissions)
-		self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait=True)
-		self.logger.info('joined chat room: ' + room)
+		if self.is_connected:
+			self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait=True)
+			self.logger.info('joined chat room: ' + room)
 
 	def chat_room_leave(self, room):
 		if not room in self.plugin['xep_0045'].getJoinedRooms():
@@ -82,6 +72,10 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.plugin['xep_0045'].leaveMUC(room, self.boundjid.user)
 		self.logger.info('left chat room: ' + room)
 		del self.authorized_users[room]
+
+	@property
+	def is_connected(self):
+		return self.state.current_state() == 'connected'
 
 	def session_start(self, event):
 		self.records['last connect time'] = time.time()
@@ -116,7 +110,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			return
 
 		session_id = str(jid) # session_id as used in the AIML brain
-		if message[0] in ['!', '/']:
+		if message[0] in ('!', '/'):
 			self.message_command(msg)
 			return
 		elif msg['body'][:4] == '?OTR':
@@ -159,6 +153,20 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.records['failed message count'] += 1
 		return
 
+	def module_load(self, module_name, config=None):
+		self.logger.info('loading xmpp module: ' + module_name)
+		try:
+			module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
+			module_instance = module.Module()
+		except Exception as err:
+			self.logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__, exc_info=True)
+			return False
+		module_instance.init_bot(self)
+		if config:
+			module_instance.update_options(config)
+		self.bot_modules.append(module_instance)
+		return True
+
 	def send_message_formatted(self, mto, mbody, mtype=None):
 		if not mbody:
 			return
@@ -189,8 +197,6 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			userlvl = users.get_level_by_name(userlvl)
 		elif not isinstance(userlvl, int):
 			raise TypeError('invalid userlvl type')
-		if not command in self.command_permissions:
-			raise Exception('can not set permission for unknown command: ' + repr(command))
 		self.command_permissions[command] = userlvl
 
 	def message_command(self, msg):
@@ -230,128 +236,24 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error_message, exc_info=True)
 		return
 
-	def cmd_bot(self, args, jid, is_muc):
-		parser = ArgumentParserLite('bot', 'control the bot')
-		parser.add_argument('-l', '--log', dest='loglvl', action='store', default=None, help='set the bots logging level')
-		parser.add_argument('--shutdown', dest='stop', action='store_true', default=False, help='stop the bot from running')
-		parser.add_argument('--join', dest='chat_room_join', action='store', default=None, help='join a chat room')
-		parser.add_argument('--leave', dest='chat_room_leave', action='store', default=None, help='leave a chat room')
-		if not len(args):
-			return parser.format_help()
-		results = parser.parse_args(args)
-		response = ''
-		if results['loglvl']:
-			results['loglvl'] = results['loglvl'].upper()
-			if results['loglvl'] in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
-				log = logging.getLogger('')
-				log.setLevel(getattr(logging, results['loglvl']))
-				self.logger.info('successfully set the logging level to: ' + results['loglvl'])
-				response += 'Successfully set the logging level to: ' + results['loglvl']
-		if results['chat_room_join']:
-			self.chat_room_join(results['chat_room_join'])
-			response += 'Joined chat room: ' + results['chat_room_join']
-		if results['chat_room_leave']:
-			self.chat_room_leave(results['chat_room_leave'])
-			response += 'Left chat room: ' + results['chat_room_leave']
-		if results['stop']:
-			self.bot_request_stop()
-		return response
-
 	def cmd_help(self, args, jid, is_muc):
 		user = self.authorized_users[jid.bare]
-		user_lvl = user.level
 
-		response = 'Version: ' + __version__ + '\nAvailable Commands:\n'
+		response = 'Cassie Version: ' + __version__ + '\nAvailable Commands:\n'
 		commands = []
-		for command in map(lambda x: x[4:], filter(lambda x: x.startswith('cmd_'), dir(self))):
-			if self.command_handler_get(command, user_lvl):
+		for command in dir(self):
+			if not command.startswith('cmd_'):
+				continue
+			command = command[4:]
+			if self.command_handler_get(command, user.level):
 				commands.append(command)
 		for module in self.bot_modules:
 			for command in module.commands:
-				if self.command_handler_get(command, user_lvl):
+				if self.command_handler_get(command, user.level):
 					commands.append(command)
 		if 'help' in commands:
 			commands.remove('help')
 		response += '\n'.join(commands)
-		return response
-
-	def cmd_info(self, args, jid, is_muc):
-		MINUTE = 60
-		HOUR = 60 * MINUTE
-		DAY = 24 * HOUR
-
-		now = int(time.time())
-		response = 'Cassie Information:\n'
-		response += '== General Information ==\n'
-		response += 'Version: ' + __version__ + '\n'
-		response += 'PID: ' + str(os.getpid()) + '\n'
-		response += "Number of Messages: {:,}\n".format(self.records['message count'])
-		response += "Number of Failed Messages: {:,}\n".format(self.records['failed message count'])
-		if self.records['message count'] != 0:
-			response += "Message Success Rate: {:.2f}%\n".format((float(self.records['message count'] - self.records['failed message count']) / float(self.records['message count'])) * 100)
-		response += "Number of Jobs: Enabled: {:,} Total: {:,}\n".format(self.job_manager.job_count_enabled(), self.job_manager.job_count())
-		if len(self.bot_modules):
-			response += 'Loaded Modules:'
-			response += '\n    ' + "\n    ".join(mod.name for mod in self.bot_modules)
-			response += '\n'
-
-		response += '\n== Uptime Information ==\n'
-		response += 'Core Initialization Time: ' + time.asctime(time.localtime(self.records['init time'])) + '\n'
-		then = int(self.records['init time'])
-		days = (now - then) / DAY
-		hours = ((now - then) % DAY) / HOUR
-		minutes = (((now - then) % DAY) % HOUR) / MINUTE
-		seconds = (((now - then) % DAY) % HOUR) % MINUTE
-		response += "Core Uptime: {:,.0f} days {:.0f} hours {:.0f} minutes {:.0f} seconds\n".format(days, hours, minutes, seconds)
-
-		response += 'Last XMPP Connect Time: ' + time.asctime(time.localtime(self.records['last connect time'])) + '\n'
-		then = int(self.records['last connect time'])
-		days = (now - then) / DAY
-		hours = ((now - then) % DAY) / HOUR
-		minutes = (((now - then) % DAY) % HOUR) / MINUTE
-		seconds = (((now - then) % DAY) % HOUR) % MINUTE
-		response += "XMPP Uptime: {:,.0f} days {:.0f} hours {:.0f} minutes {:.0f} seconds\n".format(days, hours, minutes, seconds)
-		return response[:-1]
-
-	def cmd_user(self, args, jid, is_muc):
-		parser = ArgumentParserLite('user', 'add/delete/modify users')
-		parser.add_argument('-a', '--add', dest='add user', action='store', default=None, help='add user')
-		parser.add_argument('-d', '--del', dest='delete user', action='store', default=None, help='delete user')
-		parser.add_argument('-l', '--lvl', dest='permissions', action='store', default='USER', help='permission level of user')
-		parser.add_argument('-s', '--show', dest='show', action='store_true', default=False, help='show the user database')
-		if not len(args):
-			return parser.format_help()
-		results = parser.parse_args(args)
-		response = ''
-		privilege_level = users.get_level_by_name(results['permissions'])
-		if privilege_level is None:
-			return 'Invalid privilege level'
-		if results['add user']:
-			if not results['add user'] in self.authorized_users:
-				self.authorized_users[results['add user']] = users.User(results['add user'], privilege_level)
-				response += 'Successfully Added User: ' + results['add user']
-			else:
-				response += 'Can Not Add Already Authorized User'
-		if results['delete user']:
-			if not results['delete user'] in self.authorized_users:
-				response += 'Can Not Delete Non-Authorized User'
-			else:
-				del self.authorized_users[results['delete user']]
-				response += 'Successfully Deleted User: ' + results['delete user']
-		if results['show']:
-			if not response:
-				response += '\n'
-			response += 'User Listing:\n'
-			for user in self.authorized_users:
-				response += user.type.upper() + ' ' + user.name + ' ' + user.level_name + '\n'
-			response += '\n'
-		if not response:
-			return 'Missing Action'
-		response += '\n'
-		try:
-			self.authorized_users.save()
-		except:
-			response += 'Failed To Save User Database'
 		return response
 
 	def custom_message_handler_add(self, jid, callback, expiration, reset_expiration=True):

@@ -45,17 +45,7 @@ def main():
 	arguments = parser.parse_args()
 
 	console_log_handler = configure_stream_logger(arguments.loglvl, arguments.logger)
-
 	config = configuration.Configuration(arguments.config_path)
-	settings = {}
-	settings['xmpp_jid'] = config.get('xmpp.jid')
-	settings['xmpp_password'] = config.get('xmpp.password')
-	settings['xmpp_server'] = config.get('xmpp.server')
-	settings['xmpp_port'] = config.get('xmpp.port')
-	settings['xmpp_admin'] = config.get('xmpp.admin')
-	settings['xmpp_users_file'] = config.get('xmpp.users_file')
-	if config.has_option('xmpp.chat_room'):
-		settings['xmpp_chat_room'] = config.get('xmpp.chat_room')
 
 	# configure logging
 	if config.has_section('logging'):
@@ -69,32 +59,6 @@ def main():
 		if config.has_option('logging.console') and config.get('logging.console'):
 			console_log_handler.setLevel(log_level)
 	logger = logging.getLogger('cassie.main')
-
-	if not arguments.fork:
-		console = logging.StreamHandler()
-		console.setFormatter(logging.Formatter("%(levelname)-10s %(message)s"))
-		logging.getLogger('').addHandler(console)
-
-	modules = {}
-	# try:
-	# 	module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
-	# 	for module_name in module_sections:
-	# 		module_name = module_name[4:]
-	# 		logger.info('loading xmpp module: ' + module_name)
-	# 		try:
-	# 			module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
-	# 			module_instance = module.Module()
-	# 		except Exception as err:
-	# 			logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__)
-	# 			continue
-	# 		module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
-	# 		modules[module_name] = module_instance
-	# except NoOptionError as err:
-	# 	print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
-	# 	return os.EX_CONFIG
-	# except ValueError as err:
-	# 	print 'Invalid Option ' + err.message + ' From Config File.'
-	# 	return os.EX_CONFIG
 
 	if arguments.fork:
 		pid_file = config.get('core.pid_file')
@@ -117,26 +81,33 @@ def main():
 			return os.EX_OK
 
 	cassie_bot = CassieXMPPBot(
-		settings['xmpp_jid'],
-		settings['xmpp_password'],
-		settings['xmpp_admin'],
-		settings['xmpp_users_file'],
-		settings.get('xmpp_chat_room')
+		config.get('xmpp.jid'),
+		config.get('xmpp.password'),
+		config.get('xmpp.admin'),
+		config.get('core.users_file')
 	)
+	if config.has_option('xmpp.chat_room'):
+		cassie_bot.chat_room_join(config.get('xmpp.chat_room'))
 
-	if settings.get('core_setuid'):
+	for module_name, module_config in config.get('modules').items():
+		if not isinstance(module_config, dict):
+			module_config = None
+		cassie_bot.module_load(module_name, module_config)
+
+	if config.has_option('core.setuid'):
+		setuid = config.get('core.setuid')
 		if os.getuid() == 0:
 			try:
-				os.setregid(settings['core_setuid'], settings['core_setuid'])
-				os.setreuid(settings['core_setuid'], settings['core_setuid'])
+				os.setregid(setuid, setuid)
+				os.setreuid(setuid, setuid)
 			except:
-				logger.critical('could not set the gid and uid to: ' + str(settings['core_setuid']))
+				logger.critical('could not set the gid and uid to: ' + str(setuid))
 				return os.EX_OSERR
-			logger.info('successfully set the gid and uid to: ' + str(settings['core_setuid']))
+			logger.info('successfully set the gid and uid to: ' + str(setuid))
 		elif os.getuid() != 0:
 			logger.error('cannot setuid when not executed as root')
 
-	if not cassie_bot.connect((settings['xmpp_server'], settings['xmpp_port'])):
+	if not cassie_bot.connect((config.get('xmpp.server.host'), config.get('xmpp.server.port'))):
 		logger.error('connecting to the remote xmpp server failed')
 		return os.EX_UNAVAILABLE
 

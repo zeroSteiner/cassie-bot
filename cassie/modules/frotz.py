@@ -26,7 +26,7 @@ def is_write_ready(i, timeout):
 
 class Frotz(object):
 	frotz_flags = ['-p']
-	def __init__(self, game_file, frotz_bin = 'dfrotz', read_timeout = 0.25):
+	def __init__(self, game_file, frotz_bin='dfrotz', read_timeout=0.25):
 		self.read_timeout = read_timeout
 		if not os.access(game_file, os.R_OK):
 			raise Exception('invalid game file')
@@ -40,7 +40,7 @@ class Frotz(object):
 		settings[3] = settings[3] & ~termios.ECHO
 		termios.tcsetattr(frotz_out_pty[0], termios.TCSADRAIN, settings)
 
-		self.frotz_proc = subprocess.Popen(command, stdin = frotz_out_pty[1], stdout = frotz_out_pty[1], stderr = subprocess.PIPE, bufsize = 0)
+		self.frotz_proc = subprocess.Popen(command, stdin=frotz_out_pty[1], stdout=frotz_out_pty[1], stderr=subprocess.PIPE, bufsize=0)
 		self.frotz_stdin = os.fdopen(frotz_out_pty[0], 'wrb', 0)
 		self.frotz_stdout = self.frotz_stdin
 		self.frotz_game_file = game_file
@@ -63,7 +63,7 @@ class Frotz(object):
 		output = self.read_output()
 		return output
 
-	def game_start(self, restore_file = None):
+	def game_start(self, restore_file=None):
 		output = self.read_output()
 		if restore_file:
 			output = self.game_restore(restore_file)
@@ -105,16 +105,16 @@ class Module(CassieXMPPBotModule):
 	def init_bot(self, *args, **kwargs):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.bot.command_handler_set_permission('frotz', 'user')
-		self.job_id = self.bot.job_manager.job_add(self.game_reaper, hours = 0, minutes = 5, seconds = 0)
+		self.job_id = self.bot.job_manager.job_add(self.game_reaper, hours=0, minutes=5, seconds=0)
 
 	def cmd_frotz(self, args, jid, is_muc):
 		parser = ArgumentParserLite('frotz', 'play z-machine games with frotz', 'each user can create one save file per game')
-		parser.add_argument('-n', '--new', dest = 'new_game', action = 'store_true', help = 'start a new game')
-		parser.add_argument('-r', '--restore', dest = 'restore_game', action = 'store_true', help = 'restore a previous game')
-		parser.add_argument('-q', '--quit', dest = 'quit_game', action = 'store_true', help = 'quit playing the game')
-		parser.add_argument('-s', '--save', dest = 'save_game', action = 'store_true', help = 'save the current game')
-		parser.add_argument('-g', '--game', dest = 'game', action = 'store', help = 'game to play')
-		parser.add_argument('--list-games', dest = 'list_games', action = 'store_true', help = 'list available games')
+		parser.add_argument('-n', '--new', dest='new_game', action='store_true', help='start a new game')
+		parser.add_argument('-r', '--restore', dest='restore_game', action='store_true', help='restore a previous game')
+		parser.add_argument('-q', '--quit', dest='quit_game', action='store_true', help='quit playing the game')
+		parser.add_argument('-s', '--save', dest='save_game', action='store_true', help='save the current game')
+		parser.add_argument('-g', '--game', dest='game', action='store', help='game to play')
+		parser.add_argument('--list-games', dest='list_games', action='store_true', help='list available games')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -157,7 +157,7 @@ class Module(CassieXMPPBotModule):
 					self.logger.info(str(jid.jid) + ' is starting a new game with frotz')
 				elif results['restore_game']:
 					self.logger.info(str(jid.jid) + ' is restoring a game with frotz')
-				self.frotz_instances[user] = {'frotz':Frotz(game_file, frotz_bin = self.options['binary']), 'handler_id':None}
+				self.frotz_instances[user] = {'frotz': Frotz(game_file, frotz_bin=self.options['binary']), 'handler_id': None}
 				frotz = self.frotz_instances[user]['frotz']
 				if is_muc:
 					handler_id = self.bot.custom_message_handler_add(jid.bare, self.callback_play_game, self.options['handler_timeout'])
@@ -182,14 +182,14 @@ class Module(CassieXMPPBotModule):
 		with self.frotz_instances_lock:
 			game_info = self.frotz_instances[user]
 			game_info['frotz'].game_end()
-			self.bot.custom_message_handler_del(handler_id = game_info['handler_id'], safe = True)
+			self.bot.custom_message_handler_del(handler_id=game_info['handler_id'], safe=True)
 			del self.frotz_instances[user]
 
 	def game_reaper(self):
 		with self.frotz_instances_lock:
 			games_for_removal = []
 			for user, game_info in self.frotz_instances.items():
-				if not self.bot.custom_message_handler_exists(handler_id = game_info['handler_id']):
+				if not self.bot.custom_message_handler_exists(handler_id=game_info['handler_id']):
 					games_for_removal.append(user)
 			for user in games_for_removal:
 				self.cleanup_game(user)
