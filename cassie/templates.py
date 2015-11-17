@@ -2,13 +2,15 @@ import logging
 import os
 
 class CassieXMPPBotModule(object):
-	def __init__(self):
+	permissions = {}
+	def __init__(self, bot):
 		self.options = {}
-		self.bot = None
-		self.name = self.__class__.__module__.split('.')[-1]
-
-	def init_bot(self, bot):
 		self.bot = bot
+		self.name = self.__class__.__module__.split('.')[-1]
+		for command, level in self.permissions.items():
+			if not command in self.commands:
+				raise ValueError('can not set permission for non-existing command: ' + command)
+			self.bot.command_handler_set_permission(command, level)
 
 	def update_options(self, options):
 		self.options.update(options)

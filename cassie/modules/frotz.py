@@ -90,14 +90,11 @@ class Frotz(object):
 		return self.frotz_proc.poll() is None
 
 class Module(CassieXMPPBotModule):
-	def __init__(self):
-		CassieXMPPBotModule.__init__(self)
+	permissions = {'frotz': 'user'}
+	def __init__(self, *args, **kwargs):
+		super(Module, self).__init__(*args, **kwargs)
 		self.frotz_instances = {}
 		self.frotz_instances_lock = threading.RLock()
-
-	def init_bot(self, *args, **kwargs):
-		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
-		self.bot.command_handler_set_permission('frotz', 'user')
 		self.job_id = self.bot.job_manager.job_add(self.game_reaper, minutes=5)
 
 	def cmd_frotz(self, args, jid, is_muc):

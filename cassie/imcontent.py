@@ -1,4 +1,5 @@
 import markdown
+
 from sleekxmpp.xmlstream import ET
 
 def normalize_text(text):
@@ -10,13 +11,13 @@ def normalize_text(text):
 	return text
 
 def markdown_to_html(text):
-	return markdown.markdown(text, extensions = ['nl2br'], output_format = 'html4')
+	return markdown.markdown(text, extensions=['nl2br'], output_format='html4')
 
 def markdown_to_xhtml(text):
-	return markdown.markdown(text, extensions = ['nl2br'], output_format = 'xhtml1')
+	return markdown.markdown(text, extensions=['nl2br'], output_format='xhtml1')
 
-class IMContentText:
-	def __init__(self, text, font = None, prepend_newline = False):
+class IMContentText(object):
+	def __init__(self, text, font=None, prepend_newline=False):
 		self.text = normalize_text(text)
 		if prepend_newline:
 			self.text = '\n' + self.text
@@ -25,7 +26,7 @@ class IMContentText:
 	def get_text(self):
 		return self.text
 
-	def get_xhtml(self, element = True):
+	def get_xhtml(self, element=True):
 		lines = self.text.split('\n')
 		xhtml = ET.Element('span')
 		if self.font:
@@ -41,7 +42,7 @@ class IMContentText:
 		return ET.tostring(xhtml)
 
 class IMContentMarkdown(IMContentText):
-	def get_xhtml(self, element = True):
+	def get_xhtml(self, element=True):
 		xhtml = ET.XML(markdown_to_xhtml(self.text))
 		if self.font:
 			span = ET.Element('span')

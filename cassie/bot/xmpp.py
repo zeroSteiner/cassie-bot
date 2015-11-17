@@ -2,7 +2,6 @@ import collections
 import datetime
 import hashlib
 import logging
-import os
 import shlex
 import signal
 import ssl
@@ -13,7 +12,6 @@ import time
 import uuid
 
 from cassie import __version__
-from cassie.argparselite import ArgumentParserLite
 from cassie.errors import *
 from cassie.imcontent import IMContentText, IMContentMarkdown
 from cassie.bot import users
@@ -109,7 +107,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		else:
 			return
 
-		session_id = str(jid) # session_id as used in the AIML brain
+		session_id = str(jid)  # session_id as used in the AIML brain
 		if message[0] in ('!', '/'):
 			self.message_command(msg)
 			return
@@ -146,22 +144,17 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		message_body = message.replace('\'', '').replace('-', '')
 		self.records['message count'] += 1
 		self.logger.debug('received input \'' + message_body + '\' from user: ' + session_id)
-		response = 'no brain'
-		if response:
-			msg.reply(response).send()
-		else:
-			self.records['failed message count'] += 1
+		self.records['failed message count'] += 1
 		return
 
 	def module_load(self, module_name, config=None):
 		self.logger.info('loading xmpp module: ' + module_name)
 		try:
 			module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
-			module_instance = module.Module()
+			module_instance = module.Module(self)
 		except Exception as err:
 			self.logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__, exc_info=True)
 			return False
-		module_instance.init_bot(self)
 		if config:
 			module_instance.update_options(config)
 		self.bot_modules.append(module_instance)

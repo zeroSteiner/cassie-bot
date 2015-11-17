@@ -13,8 +13,8 @@ def github_repo_exists(repository):
 	return resp.ok
 
 class Module(CassieXMPPBotModule):
-	def __init__(self):
-		CassieXMPPBotModule.__init__(self)
+	def __init__(self, *args, **kwargs):
+		super(Module, self).__init__(*args, **kwargs)
 		self.repositories = []
 		self.report_rooms = []
 		self.reported_commits = {}
@@ -23,9 +23,6 @@ class Module(CassieXMPPBotModule):
 		self.check_frequency = datetime.timedelta(0, 1200)  # in seconds
 		self.job_id = None
 		self.job_start_time = datetime.datetime.utcnow()
-
-	def init_bot(self, *args, **kwargs):
-		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.job_start_time = datetime.datetime.utcnow()
 		self.job_id = self.bot.job_manager.job_add(self.check_github_repo_activity, seconds=self.check_frequency.seconds)
 
