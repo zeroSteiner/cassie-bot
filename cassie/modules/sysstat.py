@@ -6,7 +6,7 @@ import psutil
 class Module(CassieXMPPBotModule):
 	def cmd_sysstat(self, args, jid, is_muc):
 		response = []
-		mp_lengths = map(lambda x:len(x.mountpoint), psutil.disk_partitions())
+		mp_lengths = [len(mp.mountpoint) for mp in psutil.disk_partitions()]
 		mp_lengths.sort()
 		longest_mount_point = mp_lengths.pop()
 		disk_format_string = "{0: <" + str(max(longest_mount_point, 8)) + "} {1}"
@@ -23,7 +23,7 @@ class Module(CassieXMPPBotModule):
 		response.append("{0: <8} {1}".format('Swap', generate_progress_bar(swap.percent)))
 		response.append('')
 		response.append('== CPU Usage ==')
-		cpu_usages = psutil.cpu_percent(interval = 1, percpu = True)
-		for cpu in xrange(len(cpu_usages)):
+		cpu_usages = psutil.cpu_percent(interval=1, percpu=True)
+		for cpu in range(len(cpu_usages)):
 			response.append("{0: <8} {1}".format('CPU-' + str(cpu), generate_progress_bar(cpu_usages[cpu])))
 		return '\n'.join(response)

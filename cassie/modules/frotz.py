@@ -8,15 +8,7 @@ import threading
 from cassie.argparselite import ArgumentParserLite
 from cassie.templates import CassieXMPPBotModule
 
-"""
-# Example config:
-[mod_frotz]
-save_directory: /path/to/save/games
-binary: /usr/local/bin/dfrotz
-handler_timeout: 300
-# Games are listed here
-game0: Game0,/path/to/game/file
-"""
+# requires https://github.com/DavidGriffith/frotz
 
 def is_read_ready(o, timeout):
 	return len(select.select([o], [], [], timeout)[0]) == 1
@@ -25,7 +17,7 @@ def is_write_ready(i, timeout):
 	return len(select.select([], [i], [], timeout)[1]) == 1
 
 class Frotz(object):
-	frotz_flags = ['-p']
+	frotz_flags = ('-p',)
 	def __init__(self, game_file, frotz_bin='dfrotz', read_timeout=0.25):
 		self.read_timeout = read_timeout
 		if not os.access(game_file, os.R_OK):
@@ -41,7 +33,7 @@ class Frotz(object):
 		termios.tcsetattr(frotz_out_pty[0], termios.TCSADRAIN, settings)
 
 		self.frotz_proc = subprocess.Popen(command, stdin=frotz_out_pty[1], stdout=frotz_out_pty[1], stderr=subprocess.PIPE, bufsize=0)
-		self.frotz_stdin = os.fdopen(frotz_out_pty[0], 'wrb', 0)
+		self.frotz_stdin = os.fdopen(frotz_out_pty[0], 'rb+', 0)
 		self.frotz_stdout = self.frotz_stdin
 		self.frotz_game_file = game_file
 
@@ -49,17 +41,18 @@ class Frotz(object):
 		output_line = []
 		while is_read_ready(self.frotz_stdout, self.read_timeout):
 			output_line.append(self.frotz_stdout.read(1))
-		output = ''.join(output_line)
+		output = b''.join(output_line)
+		output = output.decode('utf-8')
 		if output.endswith('>'):
 			output = output[:-1]
 		output = output.strip()
 		return output
 
 	def game_restore(self, restore_file):
-		self.frotz_stdin.write('restore\n')
+		self.frotz_stdin.write(b'restore\n')
 		if is_read_ready(self.frotz_stdout, self.read_timeout):
 			termios.tcflush(self.frotz_stdout, termios.TCIFLUSH)
-		self.frotz_stdin.write(restore_file + '\n')
+		self.frotz_stdin.write((restore_file + '\n').encode('utf-8'))
 		output = self.read_output()
 		return output
 
@@ -70,19 +63,19 @@ class Frotz(object):
 		return output
 
 	def game_save(self, save_file):
-		self.frotz_stdin.write('save\n')
+		self.frotz_stdin.write(b'save\n')
 		if is_read_ready(self.frotz_stdout, self.read_timeout):
 			termios.tcflush(self.frotz_stdout, termios.TCIFLUSH)
-		self.frotz_stdin.write(save_file + '\n')
+		self.frotz_stdin.write((save_file + '\n').encode('utf-8'))
 		output = self.read_output()
 		if output.lower().startswith('overwrite existing file?'):
-			self.frotz_stdin.write('Y\n')
+			self.frotz_stdin.write(b'Y\n')
 			output = self.read_output()
 		return output
 
 	def interpret(self, command):
-		command = command.strip()
-		self.frotz_stdin.write(command + '\n')
+		command = command.strip() + '\n'
+		self.frotz_stdin.write(command.encode('utf-8'))
 		output = self.read_output()
 		return output
 
@@ -94,7 +87,7 @@ class Frotz(object):
 
 	@property
 	def running(self):
-		return self.frotz_proc.poll() == None
+		return self.frotz_proc.poll() is None
 
 class Module(CassieXMPPBotModule):
 	def __init__(self):
@@ -105,7 +98,7 @@ class Module(CassieXMPPBotModule):
 	def init_bot(self, *args, **kwargs):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.bot.command_handler_set_permission('frotz', 'user')
-		self.job_id = self.bot.job_manager.job_add(self.game_reaper, hours=0, minutes=5, seconds=0)
+		self.job_id = self.bot.job_manager.job_add(self.game_reaper, minutes=5)
 
 	def cmd_frotz(self, args, jid, is_muc):
 		parser = ArgumentParserLite('frotz', 'play z-machine games with frotz', 'each user can create one save file per game')
@@ -122,7 +115,7 @@ class Module(CassieXMPPBotModule):
 
 		if results['list_games']:
 			resp = ['Available Games:']
-			games = self.options['games'].keys()
+			games = list(self.options['games'].keys())
 			games.sort()
 			resp.extend(games)
 			return resp
@@ -130,7 +123,7 @@ class Module(CassieXMPPBotModule):
 		with self.frotz_instances_lock:
 			if results['new_game'] or results['restore_game']:
 				if not results['game'] in self.options['games']:
-					if results['game'] == None:
+					if results['game'] is None:
 						msg = 'Please select a game with the -g option'
 					else:
 						msg = 'Invalid game file'
@@ -201,13 +194,13 @@ class Module(CassieXMPPBotModule):
 		if not msg:
 			return
 		cmd = msg.split(' ', 1)[0]
-		if cmd.lower() in ['new', 'restore', 'save', 'q', 'quit']:	# command to arguments ie new to --new and save to --save
+		if cmd.lower() in ['new', 'restore', 'save', 'q', 'quit']:  # command to arguments ie new to --new and save to --save
 			cmd = cmd.lower()
 			if len(cmd) == 1:
 				args = ['-' + cmd[0]]
 			else:
 				args = ['--' + cmd]
-			if cmd in ['new', 'restore']:	# new and restore require a game to be specified
+			if cmd in ['new', 'restore']:  # new and restore require a game to be specified
 				game = None
 				for game_name, game_file in self.options['games'].items():
 					if game_file == frotz.frotz_game_file:
@@ -216,18 +209,15 @@ class Module(CassieXMPPBotModule):
 					raise Exception('could not determine the current game name')
 				args.append('-g')
 				args.append(game)
-			return self.cmd_frotz(args, jid)
+			return self.cmd_frotz(args, jid, False)
 		return frotz.interpret(msg)
 
-	def config_parser(self, config):
+	def update_options(self, config):
 		self.options['save_directory'] = config.get('save_directory')
 		self.options['binary'] = config.get('binary', 'dfrotz')
-		self.options['handler_timeout'] = config.getint('handler_timeout', 600)
+		self.options['handler_timeout'] = config.get('handler_timeout', 600)
 		self.options['games'] = {}
-		for opt_name, opt_value in config.items():
-			if not opt_name.startswith('game'):
-				continue
-			game_name, game_file = opt_value.split(',', 1)
+		for game_name, game_file in config.get('games', {}).items():
 			game_name = game_name.strip()
 			game_file = game_file.strip()
 			self.options['games'][game_name] = game_file

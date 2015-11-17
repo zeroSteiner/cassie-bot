@@ -1,26 +1,16 @@
 import collections
 import datetime
-import json
-import urllib2
 
 from cassie.argparselite import ArgumentParserLite
 from cassie.imcontent import IMContentMarkdown
 from cassie.templates import CassieXMPPBotModule
 
-"""
-# Example config:
-[mod_github]
-repository: zeroSteiner/cassie-bot
-report_room: lobby@rooms.openfire
-check_frequency: 1200
-"""
+import requests
+import smoke_zephyr.utilities as utilities
 
 def github_repo_exists(repository):
-	try:
-		url_h = urllib2.urlopen('https://api.github.com/repos/' + repository)
-	except urllib2.HTTPError:
-		return False
-	return True
+	resp = requests.get('https://api.github.com/repos/' + repository)
+	return resp.ok
 
 class Module(CassieXMPPBotModule):
 	def __init__(self):
@@ -29,25 +19,29 @@ class Module(CassieXMPPBotModule):
 		self.report_rooms = []
 		self.reported_commits = {}
 		self.reported_commits_cache_age = datetime.timedelta(1, 0)
-		self.reported_pull_requests = collections.deque(maxlen = 10)
-		self.check_frequency = datetime.timedelta(0, 1200) # in seconds
+		self.reported_pull_requests = collections.deque(maxlen=10)
+		self.check_frequency = datetime.timedelta(0, 1200)  # in seconds
 		self.job_id = None
 		self.job_start_time = datetime.datetime.utcnow()
 
 	def init_bot(self, *args, **kwargs):
 		CassieXMPPBotModule.init_bot(self, *args, **kwargs)
 		self.job_start_time = datetime.datetime.utcnow()
-		self.job_id = self.bot.job_manager.job_add(self.check_github_repo_activity, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
+		self.job_id = self.bot.job_manager.job_add(self.check_github_repo_activity, seconds=self.check_frequency.seconds)
 
-	def config_parser(self, config):
-		self.repositories.append(config.get('repository'))
-		self.report_rooms.append(config.get('report_room'))
-		self.check_frequency = datetime.timedelta(0, config.getint('check_frequency', 1200))
+	def update_options(self, config):
+		self.repositories.extend(config.get('repositories', []))
+		if 'room' in config:
+			self.report_rooms.append(config['room'])
+		check_frequency = config.get('frequency', 1200)
+		if isinstance(check_frequency, str):
+			check_frequency = utilities.parse_timespan(check_frequency)
+		self.check_frequency = datetime.timedelta(0, check_frequency)
 		return self.options
 
 	def cmd_github(self, args, jid, is_muc):
 		parser = ArgumentParserLite('github', 'monitor new commits and pull requests to a github repository')
-		parser.add_argument('action', required = True, help = 'github plugin action (disable, enable, status)')
+		parser.add_argument('action', required=True, help='github plugin action (disable, enable, status)')
 		if not len(args):
 			action = 'status'
 		else:
@@ -59,10 +53,10 @@ class Module(CassieXMPPBotModule):
 		job_manager = self.bot.job_manager
 		if not job_manager.job_exists(self.job_id):
 			self.job_start_time = datetime.datetime.utcnow()
-			self.job_id = job_manager.job_add(self.check_github_repo_activity, hours = 0, minutes = 0, seconds = self.check_frequency.seconds)
+			self.job_id = job_manager.job_add(self.check_github_repo_activity, seconds=self.check_frequency.seconds)
 		if action == 'status':
 			status = job_manager.job_is_enabled(self.job_id)
-			response.append("github repository is {0}running".format(('' if status else 'not '))) 
+			response.append("github repository monitor is {0}running".format(('' if status else 'not ')))
 		elif action == 'enable':
 			job_manager.job_enable(self.job_id)
 			response.append('enabled the github repository monitor')
@@ -74,21 +68,19 @@ class Module(CassieXMPPBotModule):
 	def check_github_repo_activity(self, *args):
 		for repository in self.repositories:
 			try:
-				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/commits')
-				data = url_h.read()
-				commits = json.loads(data)
+				resp = requests.get('https://api.github.com/repos/' + repository + '/commits')
+				commits = resp.json()
 				if len(commits):
 					self.handle_commits(repository, commits)
 			except:
-				self.logger.error('an error occurred while processing commits')
+				self.logger.error('an error occurred while processing commits', exc_info=True)
 			try:
-				url_h = urllib2.urlopen('https://api.github.com/repos/' + repository + '/pulls')
-				data = url_h.read()
-				pulls = json.loads(data)
+				resp = requests.get('https://api.github.com/repos/' + repository + '/pulls')
+				pulls = resp.json()
 				if len(pulls):
 					self.handle_pull_requests(repository, pulls)
 			except:
-				self.logger.error('an error occurred while processing pull requests')
+				self.logger.error('an error occurred while processing pull requests', exc_info=True)
 
 	def handle_commits(self, repository, commits):
 		now = datetime.datetime.utcnow()
@@ -112,12 +104,12 @@ class Module(CassieXMPPBotModule):
 				continue
 			self.reported_commits[commit_id] = commit_date
 			message = commit['message'].split('\n')[0]
-			report = "GitHub {repo}: {user} pushed [commit](https://github.com/{repo}/commit/{commit_id})\n\"{msg}\"".format(repo = repository, user = committer, commit_id = commit_id, msg = message)
+			report = "GitHub {repo}: {user} pushed [commit](https://github.com/{repo}/commit/{commit_id})\n\"{msg}\"".format(repo=repository, user=committer, commit_id=commit_id, msg=message)
 			self.send_report(report)
 
 	def handle_pull_requests(self, repository, pull_rqs):
 		now = datetime.datetime.utcnow()
-		recent_pulls = filter(lambda pull_rq: (datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now), pull_rqs)
+		recent_pulls = [pull_rq for pull_rq in pull_rqs if datetime.datetime.strptime(pull_rq['created_at'], "%Y-%m-%dT%H:%M:%SZ") + self.check_frequency >= now]
 		recent_pulls.reverse()
 		for pull_rq in recent_pulls:
 			number = pull_rq['number']
@@ -126,11 +118,11 @@ class Module(CassieXMPPBotModule):
 			self.reported_pull_requests.append(number)
 			user = pull_rq['user']['login']
 			title = pull_rq['title']
-			report = "GitHub {repo}: {user} opened [pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo = repository, user = user, number = number, msg = title)
+			report = "GitHub {repo}: {user} opened [pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo=repository, user=user, number=number, msg=title)
 			self.send_report(report)
 
 	def send_report(self, report):
 		report = IMContentMarkdown(report, 'Monospace')
 		for room in self.report_rooms:
 			self.bot.chat_room_join(room)
-			self.bot.send_message(room, report.get_text(), mtype = 'groupchat', mhtml = report.get_xhtml())
+			self.bot.send_message(room, report.get_text(), mtype='groupchat', mhtml=report.get_xhtml())

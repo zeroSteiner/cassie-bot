@@ -4,7 +4,7 @@ from cassie.templates import CassieXMPPBotModule
 # some clients don't like large messages
 MAX_PATTERN_SIZE = 4096
 
-def createCyclicPattern(size):
+def create_cyclic_pattern(size):
 	char1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	char2 = "abcdefghijklmnopqrstuvwxyz"
 	char3 = "0123456789"
@@ -34,23 +34,21 @@ class Module(CassieXMPPBotModule):
 
 	def cmd_cyclic_pattern(self, args, jid, is_muc):
 		parser = ArgumentParserLite('cyclic_pattern', 'create and search a cyclic pattern')
-		parser.add_argument('-s', '--size', dest = 'size', type = int, required = True, help = 'pattern size to create')
-		parser.add_argument('-p', '--pattern', dest = 'pattern', help = 'pattern to find')
-		parser.add_argument('--code', dest = 'code', action = 'store_true', help = 'format the pattern for code')
+		parser.add_argument('-s', '--size', dest='size', type=int, required=True, help='pattern size to create')
+		parser.add_argument('-p', '--pattern', dest='pattern', help='pattern to find')
+		parser.add_argument('--code', dest='code', action='store_true', help='format the pattern for code')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		if not bool(len(filter(lambda x: x != None, results))):
-			return parser.format_help()
 
 		size = results['size']
 		if size > MAX_PATTERN_SIZE:
 			return 'size is too large, max is ' + str(MAX_PATTERN_SIZE)
-		pattern = createCyclicPattern(size)
-		if results['pattern'] == None:
+		pattern = create_cyclic_pattern(size)
+		if results['pattern'] is None:
 			if results['code']:
 				code = "# Cyclic Pattern Length: {0}\n".format(len(pattern))
-				code += "pattern  = \"\"\n"
+				code += 'pattern  = ""\n'
 				for idx in range(0, len(pattern), 32):
 					code += "pattern += \"{0}\"\n".format(pattern[idx:idx + 32])
 				return code

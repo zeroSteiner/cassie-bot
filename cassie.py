@@ -89,10 +89,13 @@ def main():
 	if config.has_option('xmpp.chat_room'):
 		cassie_bot.chat_room_join(config.get('xmpp.chat_room'))
 
-	for module_name, module_config in config.get('modules').items():
-		if not isinstance(module_config, dict):
-			module_config = None
-		cassie_bot.module_load(module_name, module_config)
+	for module in config.get('modules'):
+		if isinstance(module, dict):
+			module_options = module['options']
+			module = module['name']
+		else:
+			module_options = None
+		cassie_bot.module_load(module, module_options)
 
 	if config.has_option('core.setuid'):
 		setuid = config.get('core.setuid')
