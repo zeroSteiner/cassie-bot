@@ -39,8 +39,10 @@ nosetests.xml
 
 # Cassie specific files
 # Default files from the example config
-cassie_log.txt
+cassie.log
+config.yml
 users.dat
+
 # Files that don't need version control
 aimls/*.aiml
 /*.conf

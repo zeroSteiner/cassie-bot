@@ -1,149 +1,119 @@
-#!/usr/bin/python -B
-import os
-import sys
-import signal
+#!/usr/bin/python3 -B
+import argparse
 import logging
-import getpass
-from argparse import ArgumentParser
-from ConfigParser import ConfigParser, NoOptionError
+import os
+import signal
 
 from cassie.utils import set_proc_name, SectionConfigParser
-from cassie.bot.xmpp import CassieXMPPBot, CassieXMPPBotAimlUpdater
+from cassie.bot.xmpp import CassieXMPPBot
 from cassie import __version__
 
-PROMPT = 'cassie > '
+from smoke_zephyr import configuration
 
-# Python versions before 3.0 do not use UTF-8 encoding
-# by default. To ensure that Unicode is handled properly
-# throughout SleekXMPP, we will set the default encoding
-# ourselves to UTF-8.
-if sys.version_info < (3, 0):
-	reload(sys)
-	sys.setdefaultencoding('utf8')
-else:
-	raw_input = input
+def configure_stream_logger(level, logger):
+	"""
+	Configure the default stream handler for logging messages to the console.
+	This also configures the basic logging environment for the application.
+	:param level: The level to set the logger to.
+	:type level: int, str
+	:param str logger: The logger to add the stream handler for.
+	:return: The new configured stream handler.
+	:rtype: :py:class:`logging.StreamHandler`
+	"""
+	if isinstance(level, str):
+		level = getattr(logging, level)
+	root_logger = logging.getLogger('')
+	for handler in root_logger.handlers:
+		root_logger.removeHandler(handler)
+
+	logging.getLogger(logger).setLevel(logging.DEBUG)
+	console_log_handler = logging.StreamHandler()
+	console_log_handler.setLevel(level)
+
+	console_log_handler.setFormatter(logging.Formatter("%(levelname)-10s %(message)s"))
+	logging.getLogger(logger).addHandler(console_log_handler)
+	logging.captureWarnings(True)
+	return console_log_handler
 
 def main():
-	parser = ArgumentParser(description='Cassie: Chat Bot For Offensive Security Testing', conflict_handler='resolve')
-	parser.add_argument('-c', '--config', dest='config_path', action='store', default='cassie.conf', help='path to the configuration file')
-	parser.add_argument('-f', '--foreground', dest='fork', action='store_false', default=True, help='run in foreground/do not fork a new process')
-	parser.add_argument('-u', '--update', dest='update', action='store_true', default=False, help='log in and update the currently loaded AIML set')
-	parser.add_argument('-l', '--local', dest='local', action='store_true', default=False, help='start a local AIML interpreter prompt')
+	parser = argparse.ArgumentParser(description='Cassie: Chat Bot For Offensive Security Testing', conflict_handler='resolve')
+	parser.add_argument('-c', '--config', dest='config_path', action='store', default='config.yml', help='path to the configuration file')
+	parser.add_argument('-f', '--foreground', dest='fork', action='store_false', default=True, help='do not fork a new process')
 	parser.add_argument('-v', '--version', action='version', version=parser.prog + ' Version: ' + __version__)
 	parser.add_argument('-L', '--log', dest='loglvl', action='store', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], default='WARNING', help='set the logging level')
-	parser.epilog = 'If no configuration file is specified cassie.conf will be used.'
+	parser.add_argument('--logger', default='cassie', help='specify the root logger')
 	arguments = parser.parse_args()
 
-	config = ConfigParser()
-	config.read(arguments.config_path)
+	console_log_handler = configure_stream_logger(arguments.loglvl, arguments.logger)
+
+	config = configuration.Configuration(arguments.config_path)
 	settings = {}
-	try:
-		settings['core_log_file'] = config.get('core', 'log_file')
-		if config.has_option('core', 'setuid'):
-			settings['core_setuid'] = config.getint('core', 'setuid')
-		pid_file = config.get('core', 'pid_file')
-		settings['aiml_path'] = config.get('aiml', 'path')
-		settings['aiml_plugin_path'] = config.get('aiml', 'plugin_path')
-		settings['aiml_botmaster'] = config.get('aiml', 'botmaster')
-
-		settings['xmpp_jid'] = config.get('xmpp', 'jid')
-		settings['xmpp_password'] = config.get('xmpp', 'password')
-		settings['xmpp_server'] = config.get('xmpp', 'server')
-		settings['xmpp_port'] = config.getint('xmpp', 'port')
-		settings['xmpp_admin'] = config.get('xmpp', 'admin')
-		settings['xmpp_users_file'] = config.get('xmpp', 'users_file')
-		if config.has_option('xmpp', 'chat_room'):
-			settings['xmpp_chat_room'] = config.get('xmpp', 'chat_room')
-
-	except NoOptionError as err:
-		print 'Could Not Validate Option: \'' + err.option + '\' From Config File.'
-		return os.EX_CONFIG
-	except ValueError as err:
-		print 'Invalid Option ' + err.message + ' From Config File.'
-		return os.EX_CONFIG
+	settings['xmpp_jid'] = config.get('xmpp.jid')
+	settings['xmpp_password'] = config.get('xmpp.password')
+	settings['xmpp_server'] = config.get('xmpp.server')
+	settings['xmpp_port'] = config.get('xmpp.port')
+	settings['xmpp_admin'] = config.get('xmpp.admin')
+	settings['xmpp_users_file'] = config.get('xmpp.users_file')
+	if config.has_option('xmpp.chat_room'):
+		settings['xmpp_chat_room'] = config.get('xmpp.chat_room')
 
 	# configure logging
-	logging.basicConfig(filename=settings['core_log_file'], level=getattr(logging, arguments.loglvl), format="%(name)-45s %(levelname)-10s %(asctime)s %(message)s")
+	if config.has_section('logging'):
+		log_level = min(getattr(logging, arguments.loglvl), getattr(logging, config.get('logging.level').upper()))
+		if config.has_option('logging.file') and config.get('logging.file'):
+			log_file_path = config.get('logging.file')
+			file_handler = logging.FileHandler(log_file_path)
+			file_handler.setFormatter(logging.Formatter("%(asctime)s %(name)-45s %(levelname)-10s %(message)s"))
+			logging.getLogger('').addHandler(file_handler)
+			file_handler.setLevel(log_level)
+		if config.has_option('logging.console') and config.get('logging.console'):
+			console_log_handler.setLevel(log_level)
 	logger = logging.getLogger('cassie.main')
 
-	if arguments.local or not arguments.fork or arguments.update:
+	if not arguments.fork:
 		console = logging.StreamHandler()
 		console.setFormatter(logging.Formatter("%(levelname)-10s %(message)s"))
 		logging.getLogger('').addHandler(console)
 
 	modules = {}
-	try:
-		module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
-		for module_name in module_sections:
-			module_name = module_name[4:]
-			logger.info('loading xmpp module: ' + module_name)
-			try:
-				module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
-				module_instance = module.Module()
-			except Exception as err:
-				logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__)
-				continue
-			module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
-			modules[module_name] = module_instance
-	except NoOptionError as err:
-		print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
-		return os.EX_CONFIG
-	except ValueError as err:
-		print 'Invalid Option ' + err.message + ' From Config File.'
-		return os.EX_CONFIG
-
-	if arguments.local:
-		from cassie.brain import Brain
-		cassie = Brain(modules)
-		cassie.setBotPredicate('name', 'Cassie')
-		cassie.setBotPredicate('botmaster', settings['aiml_botmaster'])
-		cassie.setBotPredicate('client-name', 'localuser')
-		cassie.setBotPredicate('client-name-full', 'localuser@localhost')
-		for root, dirs, files in os.walk(settings['aiml_path']):
-			for name in files:
-				if os.path.join(root, name).endswith('.aiml'):
-					cassie.learn(os.path.join(root, name))
-		logger.info("the AIML kernel contains {:,} categories".format(cassie.numCategories()))
-		print 'Hit Ctrl+C When You\'re Done.'
-		try:
-			while True:
-				print cassie.respond(raw_input(PROMPT))
-		except KeyboardInterrupt:
-			pass
-		except EOFError:
-			pass
-		print ''
-		return os.EX_OK
-
-	if arguments.update:
-		print 'Authenticating as: ' + settings['xmpp_admin']
-		try:
-			password = getpass.getpass("Password: ")
-		except KeyboardInterrupt:
-			return os.EX_OK
-		xmpp = CassieXMPPBotAimlUpdater(settings['xmpp_admin'], password, settings['xmpp_jid'], settings['aiml_path'])
-		logging.info('connecting to the server to initiate an AIML update')
-		if xmpp.connect((settings['xmpp_server'], settings['xmpp_port'])):
-			logging.info('transfering the AIML archive')
-			xmpp.process(block=True)
-		return os.EX_OK
+	# try:
+	# 	module_sections = filter(lambda x: x[:4] == 'mod_', config.sections())
+	# 	for module_name in module_sections:
+	# 		module_name = module_name[4:]
+	# 		logger.info('loading xmpp module: ' + module_name)
+	# 		try:
+	# 			module = __import__('cassie.modules.' + module_name, None, None, ['Module'])
+	# 			module_instance = module.Module()
+	# 		except Exception as err:
+	# 			logger.error('loading module: ' + module_name + ' failed with error: ' + err.__class__.__name__)
+	# 			continue
+	# 		module_instance.config_parser(SectionConfigParser('mod_' + module_name, config))
+	# 		modules[module_name] = module_instance
+	# except NoOptionError as err:
+	# 	print 'Cound Not Validate Option: \'' + err.option + '\' From Config File.'
+	# 	return os.EX_CONFIG
+	# except ValueError as err:
+	# 	print 'Invalid Option ' + err.message + ' From Config File.'
+	# 	return os.EX_CONFIG
 
 	if arguments.fork:
+		pid_file = config.get('core.pid_file')
 		if os.path.isfile(pid_file):
 			if not os.access(pid_file, os.W_OK):
-				logger.error('insufficient permissions to write to PID file: ' + pid_file)
+				logger.error('insufficient permissions to write to pid file: ' + pid_file)
 				return os.EX_NOPERM
 		elif not os.access(os.path.split(pid_file)[0], os.W_OK):
-			logger.error('insufficient permissions to write to PID file: ' + pid_file)
+			logger.error('insufficient permissions to write to pid file: ' + pid_file)
 			return os.EX_NOPERM
 		cpid = os.fork()
 		if cpid:
-			logger.info('forked child process with PID of: ' + str(cpid))
+			logger.info('forked child process with pid of: ' + str(cpid))
 			try:
-				pid_file_h = open(pid_file, 'w')
-				pid_file_h.write(str(cpid) + '\n')
+				with open(pid_file, 'w') as file_h:
+					file_h.write(str(cpid) + '\n')
 			except IOError:
-				logger.error('could not write to PID file: ' + pid_file)
+				logger.error('could not write to pid file: ' + pid_file)
+				return os.EX_NOPERM
 			return os.EX_OK
 
 	cassie_bot = CassieXMPPBot(
@@ -151,10 +121,6 @@ def main():
 		settings['xmpp_password'],
 		settings['xmpp_admin'],
 		settings['xmpp_users_file'],
-		settings['aiml_path'],
-		settings['aiml_plugin_path'],
-		settings['aiml_botmaster'],
-		modules,
 		settings.get('xmpp_chat_room')
 	)
 
