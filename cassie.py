@@ -4,7 +4,7 @@ import logging
 import os
 import signal
 
-from cassie.utils import set_proc_name, SectionConfigParser
+from cassie.utils import set_proc_name
 from cassie.bot.xmpp import CassieXMPPBot
 from cassie import __version__
 

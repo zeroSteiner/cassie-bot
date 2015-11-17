@@ -11,7 +11,7 @@ class ArgumentContainer(dict, object):
 		return self.__getitem__(name)
 
 class ArgumentParserLite(object):
-	def __init__(self, prog = '', description = None, epilog = None):
+	def __init__(self, prog='', description=None, epilog=None):
 		self.prog = prog
 		self.description = '\n'.join(textwrap.wrap((description or ''), MAX_WIDTH))
 		self.epilog = '\n'.join(textwrap.wrap((epilog or ''), MAX_WIDTH))
@@ -23,7 +23,7 @@ class ArgumentParserLite(object):
 		self_arguments = copy.deepcopy(self.__arguments__)
 		usage = 'usage: ' + self.prog
 		args = self_arguments.keys()
-		args = filter(lambda arg: arg.startswith('-'), args)
+		args = list(filter(lambda arg: arg.startswith('-'), args))
 		args.sort()
 		args.extend(self.__positionals__)
 		for arg in args:
@@ -49,7 +49,7 @@ class ArgumentParserLite(object):
 			help_text += self.description + '\n\n'
 		help_text += 'arguments:\n'
 		args = self_arguments.keys()
-		args = filter(lambda arg: arg.startswith('-'), args)
+		args = list(filter(lambda arg: arg.startswith('-'), args))
 		args.sort()
 		args.extend(self.__positionals__)
 		for arg in args:
@@ -85,7 +85,7 @@ class ArgumentParserLite(object):
 			help_text += '\n' + self.epilog
 		return help_text
 
-	def parse_args(self, args, raise_exception = True):
+	def parse_args(self, args, raise_exception=True):
 		already_done = []
 		last_argument = None
 		self_arguments = copy.deepcopy(self.__arguments__)
@@ -135,12 +135,18 @@ class ArgumentParserLite(object):
 		return results
 
 	def add_argument(self, *args, **kwargs):
-		if not 'action' in kwargs: kwargs['action'] = 'store'
-		if not 'default' in kwargs: kwargs['default'] = None
-		if not 'required' in kwargs: kwargs['required'] = False
-		if not 'help' in kwargs: kwargs['help'] = ''
-		if not 'type' in kwargs: kwargs['type'] = str
-		if not 'choices' in kwargs: kwargs['choices'] = None
+		if not 'action' in kwargs:
+			kwargs['action'] = 'store'
+		if not 'default' in kwargs:
+			kwargs['default'] = None
+		if not 'required' in kwargs:
+			kwargs['required'] = False
+		if not 'help' in kwargs:
+			kwargs['help'] = ''
+		if not 'type' in kwargs:
+			kwargs['type'] = str
+		if not 'choices' in kwargs:
+			kwargs['choices'] = None
 		kwargs['__aliases__'] = args
 
 		# defaults have been set, now sanitize
@@ -155,7 +161,8 @@ class ArgumentParserLite(object):
 			kwargs['dest'] = name
 			self.__positionals__.append(name)
 		else:
-			if not 'dest' in kwargs: raise Exception('dest must be defined')
+			if not 'dest' in kwargs:
+				raise Exception('dest must be defined')
 			for name in args:
 				if not ((len(name) == 2) and name[0] == '-') and not ((len(name) > 2) and (name[0:2] == '--')):
 					raise ValueError('arguments must be formated as -x or --xxx')

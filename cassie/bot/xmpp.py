@@ -14,31 +14,14 @@ import time
 import traceback
 import uuid
 
+from cassie import __version__
 from cassie.argparselite import ArgumentParserLite
 from cassie.errors import *
 from cassie.imcontent import IMContentText, IMContentMarkdown
-from cassie import __version__
+from cassie.bot import users
 
 import sleekxmpp
 from smoke_zephyr.job import JobManager, JobRequestDelete
-
-GUEST = 0
-USER = 1
-ADMIN = 2
-USER_LVL_NAME_TO_INT = {'GUEST': GUEST, 'USER': USER, 'ADMIN': ADMIN}
-USER_LVL_INT_TO_NAME = {GUEST: 'GUEST', USER: 'USER', ADMIN: 'ADMIN'}
-
-class CassieUserManager(dict):
-	def __init__(self, *args, **kwargs):
-		self.filename = 'users.dat'
-		if 'filename' in kwargs:
-			self.filename = kwargs['filename']
-			del kwargs['filename']
-		dict.__init__(self, *args, **kwargs)
-
-	def save(self):
-		with open(self.filename, 'wb') as file_h:
-			pickle.dump(dict((u, ud) for u, ud in self.items() if ud['type'] == 'user'), file_h)
 
 class CassieXMPPBot(sleekxmpp.ClientXMPP):
 	def __init__(self, jid, password, admin, users_file, botmaster, modules=None):
@@ -58,15 +41,9 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.add_event_handler('ibb_stream_start', self.xep_0047_handle_stream, threaded=True)
 
 		self.logger = logging.getLogger('cassie.bot.xmpp')
-		users_file = os.path.abspath(users_file)
-		if os.path.isfile(users_file):
-			self.authorized_users = CassieUserManager(pickle.load(open(users_file, 'rb')), filename=users_file)
-			self.logger.info('successfully loaded ' + str(len(self.authorized_users)) + ' authorized users')
-		else:
-			self.logger.warning('starting with empty authorized users because no file found')
-			self.authorized_users = CassieUserManager(filename=users_file)
+		self.authorized_users = users.UserManager(filename=users_file)
 		if not admin in self.authorized_users:
-			self.authorized_users[admin] = {'lvl': ADMIN, 'type': 'user'}
+			self.authorized_users[admin] = users.User(admin, level=users.LVL_ADMIN)
 		self.administrator = admin
 
 		self.records['init time'] = time.time()
@@ -79,7 +56,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.custom_message_handler_reaper_job_id = None
 
 		self.bot_modules = modules or []
-		self.command_permissions = collections.defaultdict(lambda: ADMIN)
+		self.command_permissions = collections.defaultdict(lambda: users.LVL_ADMIN)
 		#self.command_handler_set_permission('help', 'user')
 
 		#for module_name, module in modules.iteritems():
@@ -89,13 +66,13 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		#	module.init_bot(self)
 
 		#if chat_room:
-		#	self.authorized_users[chat_room] = {'lvl':USER, 'type':'room'}
+		#	self.authorized_users[chat_room] = users.Room(chat_room)
 
-	def chat_room_join(self, room, permissions=USER):
+	def chat_room_join(self, room, permissions=users.LVL_ROOM):
 		if room in self.plugin['xep_0045'].getJoinedRooms():
 			return
 		# rooms are technically authorized users
-		self.authorized_users[room] = {'lvl': permissions, 'type': 'room'}
+		self.authorized_users[room] = users.Room(room, permissions)
 		self.plugin['xep_0045'].joinMUC(room, self.boundjid.user, wait=True)
 		self.logger.info('joined chat room: ' + room)
 
@@ -112,13 +89,13 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.get_roster()
 		self.logger.info('a session to the XMPP server has been established')
 		rooms_to_rejoin = []
-		for room_name, details in self.authorized_users.items():
-			if details['type'] != 'room':
+		for room in self.authorized_users:
+			if room.type != 'room':
 				continue
-			rooms_to_rejoin.append((room_name, details['lvl']))
-		for room_name, permissions in rooms_to_rejoin:
-			self.chat_room_leave(room_name)
-			self.chat_room_join(room_name, permissions)
+			rooms_to_rejoin.append(room)
+		for room in rooms_to_rejoin:
+			self.chat_room_leave(room.name)
+			self.chat_room_join(room.name, room.level)
 
 	def message(self, msg):
 		if not len(msg['body']):
@@ -195,7 +172,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		return
 
 	def command_handler_get(self, command, userlvl):
-		if userlvl < self.command_permissions.get(command, ADMIN):
+		if userlvl > self.command_permissions[command]:
 			return None
 		cmd_handler = None
 		if hasattr(self, 'cmd_' + command):
@@ -209,10 +186,9 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 
 	def command_handler_set_permission(self, command, userlvl):
 		if isinstance(userlvl, str):
-			userlvl = userlvl.upper()
-			userlvl = USER_LVL_NAME_TO_INT[userlvl]
-		elif not isinstance(userlvl, (int, long)):
-			raise Exception('invalid userlvl type')
+			userlvl = users.get_level_by_name(userlvl)
+		elif not isinstance(userlvl, int):
+			raise TypeError('invalid userlvl type')
 		if not command in self.command_permissions:
 			raise Exception('can not set permission for unknown command: ' + repr(command))
 		self.command_permissions[command] = userlvl
@@ -221,12 +197,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		message = msg['body']
 		jid = msg['from']
 		user = self.authorized_users[jid.bare]
-		user_lvl = user['lvl']
+		user_lvl = user.level
 		if msg['type'] == 'groupchat':
 			guser = jid.resource + '@' + jid.server.split('.', 1)[1]
 			if not guser in self.authorized_users:
 				return
-			user_lvl = self.authorized_users[guser]['lvl']
+			user_lvl = self.authorized_users[guser].level
 		arguments = shlex.split(message)
 		command = arguments.pop(0)
 		command = command[1:]
@@ -248,13 +224,10 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			self.logger.warning('command error command: ' + command + ' for user ' + jid.bare)
 			self.send_message_formatted(jid, error.message, msg['type'])
 		except Exception as error:
-			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error.message).send()
+			error_message = getattr(error, 'message', 'N/A')
+			msg.reply('Failed To Execute Command, Error Name: ' + error.__class__.__name__ + ' Message: ' + error_message).send()
 			self.logger.error('failed to execute command: ' + command + ' for user ' + jid.bare)
-			self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error.message)
-			tb = traceback.format_exc().split(os.linesep)
-			for line in tb:
-				self.logger.error(line)
-			self.logger.error(error.__repr__())
+			self.logger.error('error name: ' + error.__class__.__name__ + ' message: ' + error_message, exc_info=True)
 		return
 
 	def cmd_bot(self, args, jid, is_muc):
@@ -286,7 +259,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 
 	def cmd_help(self, args, jid, is_muc):
 		user = self.authorized_users[jid.bare]
-		user_lvl = user['lvl']
+		user_lvl = user.level
 
 		response = 'Version: ' + __version__ + '\nAvailable Commands:\n'
 		commands = []
@@ -329,7 +302,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		hours = ((now - then) % DAY) / HOUR
 		minutes = (((now - then) % DAY) % HOUR) / MINUTE
 		seconds = (((now - then) % DAY) % HOUR) % MINUTE
-		response += "Core Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
+		response += "Core Uptime: {:,.0f} days {:.0f} hours {:.0f} minutes {:.0f} seconds\n".format(days, hours, minutes, seconds)
 
 		response += 'Last XMPP Connect Time: ' + time.asctime(time.localtime(self.records['last connect time'])) + '\n'
 		then = int(self.records['last connect time'])
@@ -337,7 +310,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		hours = ((now - then) % DAY) / HOUR
 		minutes = (((now - then) % DAY) % HOUR) / MINUTE
 		seconds = (((now - then) % DAY) % HOUR) % MINUTE
-		response += "XMPP Uptime: {:,} days {} hours {} minutes {} seconds\n".format(days, hours, minutes, seconds)
+		response += "XMPP Uptime: {:,.0f} days {:.0f} hours {:.0f} minutes {:.0f} seconds\n".format(days, hours, minutes, seconds)
 		return response[:-1]
 
 	def cmd_user(self, args, jid, is_muc):
@@ -350,13 +323,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			return parser.format_help()
 		results = parser.parse_args(args)
 		response = ''
-		if not results['permissions'].upper() in USER_LVL_NAME_TO_INT:
+		privilege_level = users.get_level_by_name(results['permissions'])
+		if privilege_level is None:
 			return 'Invalid privilege level'
-		else:
-			privilege_level = USER_LVL_NAME_TO_INT[results['permissions'].upper()]
 		if results['add user']:
 			if not results['add user'] in self.authorized_users:
-				self.authorized_users[results['add user']] = {'lvl': privilege_level, 'type': 'user'}
+				self.authorized_users[results['add user']] = users.User(results['add user'], privilege_level)
 				response += 'Successfully Added User: ' + results['add user']
 			else:
 				response += 'Can Not Add Already Authorized User'
@@ -370,8 +342,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if not response:
 				response += '\n'
 			response += 'User Listing:\n'
-			for user, user_desc in self.authorized_users.items():
-				response += user_desc['type'].upper() + ' ' + user + ' ' + USER_LVL_INT_TO_NAME[user_desc['lvl']].capitalize() + '\n'
+			for user in self.authorized_users:
+				response += user.type.upper() + ' ' + user.name + ' ' + user.level_name + '\n'
 			response += '\n'
 		if not response:
 			return 'Missing Action'
@@ -385,7 +357,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 	def custom_message_handler_add(self, jid, callback, expiration, reset_expiration=True):
 		jid = str(jid)
 		handler_id = None
-		if isinstance(expiration, (int, long, float)):
+		if isinstance(expiration, (int, float)):
 			lifespan = datetime.timedelta(0, expiration)
 			expiration = datetime.datetime.utcnow() + lifespan
 		elif isinstance(expiration, datetime.timedelta):
@@ -400,7 +372,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				lifespan = None
 			self.custom_message_handlers[jid] = {'callback': callback, 'expiration': expiration, 'lifespan': lifespan, 'handler_id': handler_id}
 		# start the reaper if necessary
-		if self.custom_message_handler_reaper_job_id == None:
+		if self.custom_message_handler_reaper_job_id is None:
 			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes=3)
 		elif not self.job_manager.job_exists(self.custom_message_handler_reaper_job_id):
 			self.custom_message_handler_reaper_job_id = self.job_manager.job_add(self.custom_message_handler_reaper, minutes=3)
@@ -462,7 +434,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		self.process(block=True)
 
 	def bot_request_stop(self, signum=None, frame=None):
-		if signum == None:
+		if signum is None:
 			self.logger.warning('received shutdown command, proceeding to stop')
 		elif signum == signal.SIGTERM:
 			self.logger.warning('received SIGTERM signal, proceeding to stop')
@@ -486,9 +458,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 				if not msg['from'].bare in self.authorized_users:
 					break
 				user = self.authorized_users[msg['from'].bare]
-				if user['lvl'] != ADMIN:
-					break
-				if msg['from'].resource != 'botadmin':
+				if not user.is_admin:
 					break
 				self.logger.warning('accepting an IBB stream from ' + msg['from'].bare)
 				return True
