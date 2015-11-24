@@ -115,7 +115,7 @@ class Module(CassieXMPPBotModule):
 			self.reported_pull_requests.append(number)
 			user = pull_rq['user']['login']
 			title = pull_rq['title']
-			report = "GitHub {repo}: {user} opened [pull request #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo=repository, user=user, number=number, msg=title)
+			report = "GitHub {repo}: {user} opened [PR #{number}](https://github.com/{repo}/pull/{number})\n\"{msg}\"".format(repo=repository, user=user, number=number, msg=title)
 			self.send_report(report)
 
 	def send_report(self, report):
