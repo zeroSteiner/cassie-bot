@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -B
 import argparse
 import logging
+import logging.handlers
 import os
 import signal
 
@@ -52,7 +53,7 @@ def main():
 		log_level = min(getattr(logging, arguments.loglvl), getattr(logging, config.get('logging.level').upper()))
 		if config.has_option('logging.file') and config.get('logging.file'):
 			log_file_path = config.get('logging.file')
-			file_handler = logging.FileHandler(log_file_path)
+			file_handler = logging.handlers.RotatingFileHandler(log_file_path, maxBytes=10 * 1024 * 1024, backupCount=2, encoding=None, delay=0)
 			file_handler.setFormatter(logging.Formatter("%(asctime)s %(name)-45s %(levelname)-10s %(message)s"))
 			logging.getLogger('').addHandler(file_handler)
 			file_handler.setLevel(log_level)
