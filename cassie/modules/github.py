@@ -54,6 +54,11 @@ class Module(CassieXMPPBotModule):
 		if action == 'status':
 			status = job_manager.job_is_enabled(self.job_id)
 			response.append("github repository monitor is {0}running".format(('' if status else 'not ')))
+			if len(self.repositories):
+				response.append('the following repositories are configured for monitoring')
+				response.extend('  ' + repo for repo in self.repositories)
+			else:
+				response.append('no repositories are configured for monitoring')
 		elif action == 'enable':
 			job_manager.job_enable(self.job_id)
 			response.append('enabled the github repository monitor')
