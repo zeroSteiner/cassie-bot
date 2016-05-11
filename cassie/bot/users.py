@@ -8,11 +8,15 @@ LVL_ROOM = LVL_USER
 LVL_GUEST = 1000
 
 class User(object):
-	__slots__ = ('level', 'name')
+	__slots__ = ('level', 'name', 'storage')
 	type = 'user'
 	def __init__(self, name, level=LVL_GUEST):
 		self.name = name
+		"""The unique name of this user."""
 		self.level = level
+		"""The users permission level."""
+		self.storage = {}
+		"""A dictionary which can be used by modules to store arbitrary details about a user."""
 
 	def is_admin(self):
 		return self.level == LVL_ADMIN
@@ -38,12 +42,14 @@ class UserManager(object):
 		self.logger = logging.getLogger('cassie.bot.user_manager')
 		self.filename = os.path.abspath(filename)
 		self._users = {}
-		if os.path.isfile(self.filename):
-			with open(self.filename, 'rb') as file_h:
-				self._users = pickle.load(file_h)
-			self.logger.info("successfully loaded {0:,} authorized users".format(len(self._users)))
-		else:
+		if not os.path.isfile(self.filename):
 			self.logger.warning('starting with empty authorized users because no file found')
+		with open(self.filename, 'rb') as file_h:
+			self._users = pickle.load(file_h)
+		self.logger.info("successfully loaded {0:,} authorized users".format(len(self._users)))
+		for user in self._users.values():
+			if not getattr(user, 'storage', None):
+				user.storage = {}
 
 	def __contains__(self, item):
 		return item in self._users
