@@ -44,6 +44,7 @@ class UserManager(object):
 		self._users = {}
 		if not os.path.isfile(self.filename):
 			self.logger.warning('starting with empty authorized users because no file found')
+			return
 		with open(self.filename, 'rb') as file_h:
 			self._users = pickle.load(file_h)
 		self.logger.info("successfully loaded {0:,} authorized users".format(len(self._users)))
