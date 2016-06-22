@@ -1,5 +1,7 @@
 import datetime
 
+from urllib.parse import urlparse
+
 from cassie.argparselite import ArgumentParserLite
 from cassie.imcontent import IMContentMarkdown
 from cassie.templates import CassieXMPPBotModule
@@ -16,7 +18,7 @@ class EmpireAPI(object):
 		"""Initialize a new instance of the EmpireAPI class"""
 		self.username = empire_config['user']
 		self.password = empire_config['pass']
-		self.api_base_url = empire_config['url'] + '/api/'
+		self.api_base_url = empire_config['url'] + 'api/'
 		self.json_request_headers = {'Content-Type':'application/json'}
 		self.verify_server_cert = False
 		self._token = self._get_api_token()
@@ -80,7 +82,7 @@ class EmpireAPI(object):
 
 	def get_creds(self):
 		"""Get credentials from the database"""
-		server_url = self.api_base_url + 'creds?token=[0]'.format(self._token)
+		server_url = self.api_base_url + 'creds?token={0}'.format(self._token)
 		response = self.send_get_request(server_url)
 		return response
 
@@ -116,74 +118,89 @@ class Module(CassieXMPPBotModule):
 	def user_is_configured(self, user_jid):
 		"""Check that the user has a valid Empire config"""
 		storage = self.get_storage(user_jid)
-		return 'url' in storage
+		config = True
+		user = storage.get('user')
+		passwd = storage.get('pass')
+		url = storage.get('url')
+		for x in [user, passwd, url]:
+			if x is None:
+				config = False
+		return config
 
-	def server_is_online(self, user_jid):
+	def polling_is_enabled(self, user_jid):
 		"""Check if the user enabled their server"""
 		storage = self.get_storage(user_jid)
-		return storage.get('is_online', True)
+		return storage.get('is_enabled', True)
+
+	def url_is_valid(self, url):
+		"""Check if a URL is valid"""
+		parsed_url = urlparse(url)
+		return bool(parsed_url.scheme) and bool(parsed_url.netloc) and bool(parsed_url.path)
 
 	def cmd_empire_setup(self, args, jid, is_muc):
 		"""Create the Empire config file required by this module"""
-		parser = ArgumentParserLite('empire_setup', 'create Empire config file')
-		parser.add_argument('-i', '--ip-address', dest='server_ip', help='IP address of Empire server', required=False)
-		parser.add_argument('-P', '--port', dest='server_port', help='TCP port of Empire API default: 1337', required=False, default='1337')
+		parser = ArgumentParserLite('empire_setup', 'Create an Empire config.')
+		parser.add_argument('-s', '--server-url', dest='server_url', help='URL of Empire server (i.e. "https://127.0.0.1:1337/")', required=False)
 		parser.add_argument('-u', '--username', dest='server_user', help='username for Empire API', required=False)
 		parser.add_argument('-p', '--password', dest='server_pass', help='password for Empire API', required=False)
-		parser.add_argument('-e', '--enable', dest='enable_server', help='activate automatic polling for your server', action='store_true', required=False, default=False)
-		parser.add_argument('-s', '--show', dest='show_config', help='displays you current Empire config', action='store_true', required=False, default=False)
+		parser.add_argument('-e', '--enable', dest='enable_server', help='enable automatic polling for your server', action='store_true', required=False, default=False)
+		parser.add_argument('-d', '--disable', dest='disable_server', help='disable automatic polling for your server', action='store_true', required=False, default=False)   
+		parser.add_argument('-c', '--show-config', dest='show_config', help='displays your current Empire config', action='store_true', required=False, default=False)
 		
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
-		server_url = 'https://127.0.0.1/'
-		if results['server_ip'] is not None:
-			server_url = 'https://{0}:{1}'.format(results['server_ip'], results['server_port'])
 		user_jid = str(jid).split('/')[0]
 		user_storage = self.get_storage(user_jid)
+		report_user = str(jid).split('@')[0]
+		report = ''
 		
+		if results['enable_server'] and results['disable_server']:
+			report = 'Automated polling cannot be both enabled and disabled.'
+			return report
+
+		if not self.polling_is_enabled(user_jid):
+			user_storage['is_enabled'] = False
+
+		if not self.user_is_configured and not all(results['server_user'], results['server_pass'], results['server_url']):
+			report = "{0}: Your Empire config was not able to be updated successfully.\n".format(user_jid)
+			report += 'You will not be able to leverage any Empire commands until your config is valid!\n'
+			report += 'Please run the "!empire_setup" command again.'
+			return report
+		#else:
+			#report = "{0}: Your Empire config was successfully updated!".format(report_user)
+		
+		if results['enable_server'] and not self.polling_is_enabled(user_jid):
+			user_storage['is_enabled'] = True
+			report += '  Automatic polling has been enabled for your server.\n'
+		
+		if results['disable_server'] and self.polling_is_enabled(user_jid):
+			user_storage['is_enabled'] = False
+			user_storage['agents'] = []
+			report += '  Automatic polling has been disabled for your server.\n'
+
 		if results['server_user'] is not None:
 			user_storage['user'] = results['server_user']
 
 		if results['server_pass'] is not None:
 			user_storage['pass'] = results['server_pass']
 		
-		if  'url' not in user_storage:
-			user_storage['url'] = server_url
-		
-		user_storage['is_online'] = False
-
-		if results['show_config']:
-			report = 'Current Empire Config:\n'
-			try:
-				report += 'User: [0]\n'.format(user_storage['user'])
-			except KeyError:
-				report += 'User: None\n'
-			try:
-				report += 'Password: [0]\n'.format(user_storage['pass'])
-			except KeyError:
-				report += 'Password: None\n'
-			try:
-				report += 'URL: [0]'.format(user_storage['url'])
-			except KeyError:
-				report += 'URL: None\n'
-			return report
-
-		if results['enable_server']:
-			if self.user_is_configured:
-				user_storage['is_online'] = True
+		if results['server_url'] is not None:
+			if self.url_is_valid(results['server_url']):
+				user_storage['url'] = results['server_url']
 			else:
-				report = 'Your Empire config does not exist, or there is an error with it.  Please run the "!empire_setup" command again.'
-				return report
+				report = '{0}: The specified URL is not valid.  Please enter it in the form of "https://127.0.0.1:1337/"'.format(report_user)
+			return report
+			
+		if results['show_config']:
+			if not report:
+				report = ''
+			report += 'Current Empire Config:\n'.format(report_user)
+			report += '\tUser: {0}\n'.format(user_storage.get('user', 'None'))
+			report += '\tPassword: {0}\n'.format(user_storage.get('pass', 'None'))
+			report += '\tURL: {0}\n'.format(user_storage.get('url', 'None'))
+			report += '\tPolling Enabled: {0}'.format(user_storage.get('is_enabled', 'False'))
 
-		if self.user_is_configured(user_jid):
-			report = 'Empire config successfully created!'
-			if self.server_is_online(user_jid):
-				report += '\nServer enabled!'
-		else:
-			report = 'Failed to create an Empire config!'
-			if not user_storage['is_online']:
-				report += '\n If this is the first time you have created a configuration you must pass the "-e" switch.' 
 		return report
 
 	def cmd_empire_list(self, args, jid, is_muc):
@@ -191,7 +208,6 @@ class Module(CassieXMPPBotModule):
 		parser.add_argument('-l', '--listeners', dest='list_listeners', help='list listeners', action='store_true', default=False)
 		parser.add_argument('-a', '--agents', dest='list_agents', help='list agents', action='store_true', default=False)
 		parser.add_argument('-c', '--creds', dest='list_creds', help='list credentials in the database', action='store_true', default=False)
-		#parser.add_argument('-r', '--responses', dest='list_responses', help='list responses of previously run commands', action='store_true', default=False)
 		parser.add_argument('-v', '--verbose', dest='verbose', help='verbose output', action='store_true', default=False)
 		if not len(args):
 			return parser.format_help()
@@ -205,8 +221,8 @@ class Module(CassieXMPPBotModule):
 		api = EmpireAPI(empire_config)
 		token = api.get_api_token()
 
-		if results['list_listeners'] is not False:
-			listeners_dict = api.get_listeners(token)
+		if results['list_listeners']:
+			listeners_dict = api.get_listeners()
 			listeners = listeners_dict['listeners']
 			if len(listeners) > 1:
 				report = 'There are {0} listeners available:\n'.format(str(len(listeners)))
@@ -221,9 +237,9 @@ class Module(CassieXMPPBotModule):
 						report += '{0}: {1}\n'.format(listener_property, listener[listener_property])
 			return report
 
-		if results['list_agents'] is not False:
+		if results['list_agents']:
 			desired_agent_properties = ['username', 'high_integrity', 'external_ip', 'internal_ip', 'os_details', 'lastseen_time']
-			agents_dict = api.get_agents(token)
+			agents_dict = api.get_agents()
 			agents = agents_dict['agents']
 			if len(agents) > 1:
 				report = 'There are {0} agents connected:\n'.format(str(len(agents)))
@@ -244,10 +260,10 @@ class Module(CassieXMPPBotModule):
 				report += '\n'
 			return report
 
-		if results['list_creds'] is not False:
+		if results['list_creds']:
 			reported_creds = []
 			report = 'Harvested Credentials:\n'
-			creds_dict = api.get_creds(token)
+			creds_dict = api.get_creds()
 			for cred in creds_dict:
 				if cred['credtype'] == 'password':
 					i = cred['domain'] + '\\' + cred['username']
@@ -256,14 +272,11 @@ class Module(CassieXMPPBotModule):
 						reported_creds.add(i)
 			return report
 
-		#if results['list_responses'] is not False:
-		#	report = "Command Responses:\n"
-		#	responses = api.get_cmd_output(token)
-
 	def cmd_empire_shell_exec(self, args, jid, is_muc):
 		parser = ArgumentParserLite('empire_shell_cmd', 'execute a shell command on empire agent')
 		parser.add_argument('-a', '--agent', dest='emp_agent', help='run command on specified agent')
 		parser.add_argument('-c', '--command', dest='emp_command', help='command to run')
+		#parser.add_argument('-m', '--mimikatz', dest='emp_mimi', help='execute mimikatz on specified agent')
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -276,7 +289,7 @@ class Module(CassieXMPPBotModule):
 		api = EmpireAPI(empire_config)
 		token = api.get_api_token()
 
-		exec_cmd = api.exec_shell_cmd(token, results['emp_agent'], results['emp_command'])
+		exec_cmd = api.exec_shell_cmd(results['emp_agent'], results['emp_command'])
 		report = 'Executing command "{0}" on agent: {1}\n'.format(results['emp_command'], results['emp_agent'])
 		if exec_cmd['success'] is True:
 			report += 'Success!\n'
@@ -304,7 +317,7 @@ class Module(CassieXMPPBotModule):
 				api = EmpireAPI(empire_config)
 			except Exception:
 				self.logger.warning('empire api instance failed to connect', exc_info=True)
-				empire_config['is_online'] = False
+				empire_config['is_enabled'] = False
 				continue
 			if not 'agents' in empire_config:
 				empire_config['agents'] = []
