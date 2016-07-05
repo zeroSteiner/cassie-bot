@@ -1,5 +1,6 @@
 import collections
 import datetime
+import fnmatch
 import hashlib
 import logging
 import shlex
@@ -102,7 +103,7 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		elif msg['type'] == 'groupchat':
 			if jid.resource == self.boundjid.user:
 				return
-			if not self.boundjid.user.lower() in message.split(' ', 1)[0].lower():
+			if not fnmatch.fnmatch(self.boundjid.user.lower(), message.split('.', 1)[0][1:].lower()):
 				return
 		else:
 			return
@@ -206,11 +207,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		command = arguments.pop(0)
 		command = command[1:]
 		if msg['type'] == 'groupchat':
-			if not command.startswith(self.boundjid.user + '.'):
-				return
 			if len(command.split('.')) != 2:
 				return
+			jidfilter = command.split('.', 1)[0].lower()
 			command = command.split('.', 1)[1]
+			if not fnmatch.fnmatch(self.boundjid.user.lower(), jidfilter):
+				return
 		cmd_handler = self.command_handler_get(command, user_lvl)
 		if not cmd_handler:
 			msg.reply('Command Not Found').send()
