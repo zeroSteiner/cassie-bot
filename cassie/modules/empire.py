@@ -30,18 +30,12 @@ class EmpireAPI(object):
 
 	def send_get_request(self, url):
 		"""Send a GET request to the Empire server API"""
-		try:
-			response = requests.get(url, headers=self.json_request_headers, verify=self.verify_server_cert)
-		except requests.exceptions.SSLError:
-			return 'Server certificate validation failed.'
+		response = requests.get(url, headers=self.json_request_headers, verify=self.verify_server_cert)
 		return response.json()
 
 	def send_post_request(self, url, json):
 		"""Send a POST request to the Empire server API """
-		try:
-			response = requests.post(url, headers=self.json_request_headers, json=json, verify=self.verify_server_cert)
-		except requests.exceptions.SSLError:
-			return 'Server certificate verification failed.'
+		response = requests.post(url, headers=self.json_request_headers, json=json, verify=self.verify_server_cert)
 		return response.json()
 
 	def get_api_token(self):
@@ -138,9 +132,9 @@ class Module(CassieXMPPBotModule):
 		parser.add_argument('-u', '--username', dest='server_user', help='username for Empire API', required=False)
 		parser.add_argument('-p', '--password', dest='server_pass', help='password for Empire API', required=False)
 		parser.add_argument('-e', '--enable', dest='enable_server', help='enable automatic polling for your server', action='store_true', required=False, default=False)
-		parser.add_argument('-d', '--disable', dest='disable_server', help='disable automatic polling for your server', action='store_true', required=False, default=False)   
+		parser.add_argument('-d', '--disable', dest='disable_server', help='disable automatic polling for your server', action='store_true', required=False, default=False)
 		parser.add_argument('-c', '--show-config', dest='show_config', help='displays your current Empire config', action='store_true', required=False, default=False)
-		
+
 		if not len(args):
 			return parser.format_help()
 		results = parser.parse_args(args)
@@ -161,8 +155,6 @@ class Module(CassieXMPPBotModule):
 			report += 'You will not be able to leverage any Empire commands until your config is valid!\n'
 			report += 'Please run the "!empire_setup" command again.'
 			return report
-		#else:
-			#report = "{0}: Your Empire config was successfully updated!".format(report_user)
 		
 		if results['enable_server'] and not self.polling_is_enabled(user_jid):
 			user_storage['is_enabled'] = True
@@ -185,7 +177,7 @@ class Module(CassieXMPPBotModule):
 			else:
 				report = '{0}: The specified URL is not valid.  Please enter it in the form of "https://127.0.0.1:1337/"'.format(report_user)
 			return report
-			
+
 		if results['show_config']:
 			if not report:
 				report = ''
@@ -193,6 +185,7 @@ class Module(CassieXMPPBotModule):
 			report += '\tUser: {0}\n'.format(user_storage.get('user', 'None'))
 			report += '\tPassword: {0}\n'.format(user_storage.get('pass', 'None'))
 			report += '\tURL: {0}\n'.format(user_storage.get('url', 'None'))
+			report += '\tVerify Cert: {0}\n.'format(user_storage.get('verify_cert', 'False'))
 			report += '\tPolling Enabled: {0}'.format(user_storage.get('is_enabled', 'False'))
 
 		return report
