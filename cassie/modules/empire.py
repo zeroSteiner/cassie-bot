@@ -16,17 +16,17 @@ class EmpireAPI(object):
 		self.username = empire_config['user']
 		self.password = empire_config['pass']
 		self.api_base_url = empire_config['url'] + 'api/'
-		self.json_request_headers = {'Content-Type':'application/json'}
+		self.json_request_headers = {'Content-Type': 'application/json'}
 		self.verify_server_cert = False
 		self._token = self._get_api_token()
 
 	def _get_api_token(self):
-	    """Get the token for the Empire server"""
-	    server_url = self.api_base_url + 'admin/login'
-	    creds = {"username": self.username, "password": self.password}
-	    response = self.send_post_request(server_url, json=creds)
-	    token = response['token']
-	    return token
+		"""Get the token for the Empire server"""
+		server_url = self.api_base_url + 'admin/login'
+		creds = {"username": self.username, "password": self.password}
+		response = self.send_post_request(server_url, json=creds)
+		token = response['token']
+		return token
 
 	def send_get_request(self, url):
 		"""Send a GET request to the Empire server API"""
@@ -39,28 +39,28 @@ class EmpireAPI(object):
 		return response.json()
 
 	def get_api_token(self):
-	    """Get the token for the Empire server"""
-	    server_url = self.api_base_url + 'admin/login'
-	    creds = {"username": self.username, "password": self.password}
-	    response = self.send_post_request(server_url, json=creds)
-	    return response['token']
+		"""Get the token for the Empire server"""
+		server_url = self.api_base_url + 'admin/login'
+		creds = {"username": self.username, "password": self.password}
+		response = self.send_post_request(server_url, json=creds)
+		return response['token']
 
 	def get_listeners(self):
-	    """Get the details of current listeners on the server"""
-	    server_url = self.api_base_url + 'listeners?token={0}'.format(self._token)
-	    response = self.send_get_request(server_url)
-	    return response
+		"""Get the details of current listeners on the server"""
+		server_url = self.api_base_url + 'listeners?token={0}'.format(self._token)
+		response = self.send_get_request(server_url)
+		return response
 
 	def get_agents(self):
-	    """Get the details of current agents on the server"""
-	    server_url = self.api_base_url + 'agents?token={0}'.format(self._token)
-	    response = self.send_get_request(server_url)
-	    return response
+		"""Get the details of current agents on the server"""
+		server_url = self.api_base_url + 'agents?token={0}'.format(self._token)
+		response = self.send_get_request(server_url)
+		return response
 
 	def exec_shell_cmd(self, agent, cmd):
 		"""Execute specified command on the specified agent"""
 		server_url = self.api_base_url + 'agents/' + agent + '/shell?token={0}'.format(self._token)
-		params = {"command":cmd}
+		params = {"command": cmd}
 		response = self.send_post_request(server_url, json=params)
 		return response
 
@@ -78,7 +78,7 @@ class EmpireAPI(object):
 
 class Module(CassieXMPPBotModule):
 	permissions = {'empire_list': 'user', 'empire_shell_exec': 'user', 'empire_setup': 'user'}
-	
+
 	def __init__(self, *args, **kwargs):
 		super(Module, self).__init__(*args, **kwargs)
 		self.report_rooms = []
@@ -142,7 +142,7 @@ class Module(CassieXMPPBotModule):
 		user_storage = self.get_storage(user_jid)
 		report_user = str(jid).split('@')[0]
 		report = ''
-		
+
 		if results['enable_server'] and results['disable_server']:
 			report = 'Automated polling cannot be both enabled and disabled.'
 			return report
@@ -155,11 +155,11 @@ class Module(CassieXMPPBotModule):
 			report += 'You will not be able to leverage any Empire commands until your config is valid!\n'
 			report += 'Please run the "!empire_setup" command again.'
 			return report
-		
+
 		if results['enable_server'] and not self.polling_is_enabled(user_jid):
 			user_storage['is_enabled'] = True
 			report += '  Automatic polling has been enabled for your server.\n'
-		
+
 		if results['disable_server'] and self.polling_is_enabled(user_jid):
 			user_storage['is_enabled'] = False
 			user_storage['agents'] = []
@@ -170,7 +170,7 @@ class Module(CassieXMPPBotModule):
 
 		if results['server_pass'] is not None:
 			user_storage['pass'] = results['server_pass']
-		
+
 		if results['server_url'] is not None:
 			if self.url_is_valid(results['server_url']):
 				user_storage['url'] = results['server_url']
@@ -185,7 +185,6 @@ class Module(CassieXMPPBotModule):
 			report += '\tUser: {0}\n'.format(user_storage.get('user', 'None'))
 			report += '\tPassword: {0}\n'.format(user_storage.get('pass', 'None'))
 			report += '\tURL: {0}\n'.format(user_storage.get('url', 'None'))
-			report += '\tVerify Cert: {0}\n.'format(user_storage.get('verify_cert', 'False'))
 			report += '\tPolling Enabled: {0}'.format(user_storage.get('is_enabled', 'False'))
 
 		return report
@@ -204,7 +203,7 @@ class Module(CassieXMPPBotModule):
 		if not self.user_is_configured(user_jid):
 			report = 'Sorry {0}, it looks like you do not have an Empire config yet.  Create one with the "empire_setup" module.'.format(user_jid.split('@')[0])
 			return report
-		empire_config = self.get_storage(user_jid)	
+		empire_config = self.get_storage(user_jid)
 		api = EmpireAPI(empire_config)
 		token = api.get_api_token()
 
@@ -250,13 +249,15 @@ class Module(CassieXMPPBotModule):
 		if results['list_creds']:
 			reported_creds = []
 			report = 'Harvested Credentials:\n'
-			creds_dict = api.get_creds()
-			for cred in creds_dict:
+			creds = api.get_creds()['creds']
+			for cred in creds:
 				if cred['credtype'] == 'password':
 					i = cred['domain'] + '\\' + cred['username']
 					if i not in reported_creds:
 						report += 'Domain: {0}\nUser: {1}\nPassword: {2}\n\n'.format(cred['domain'], cred['username'], cred['password'])
 						reported_creds.add(i)
+			if not len(creds):
+				report += 'No credentials are available.\n'
 			return report
 
 	def cmd_empire_shell_exec(self, args, jid, is_muc):
@@ -272,7 +273,7 @@ class Module(CassieXMPPBotModule):
 		if not self.user_is_configured(user_jid):
 			report = 'Sorry {0}, it looks like you do not have an Empire config yet.  Create one with the "empire_setup" module.'.format(user_jid.split('@')[0])
 			return report
-		empire_config = self.get_storage(user_jid)	
+		empire_config = self.get_storage(user_jid)
 		api = EmpireAPI(empire_config)
 		token = api.get_api_token()
 
