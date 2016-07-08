@@ -6,10 +6,7 @@ from cassie.argparselite import ArgumentParserLite
 from cassie.imcontent import IMContentMarkdown
 from cassie.templates import CassieXMPPBotModule
 
-try:
-	import requests
-except ImportError:
-	print('Failed to import "requests" module.')
+import requests
 
 class EmpireAPI(object):
 	"""Class to provide access to various functionality exposed through the Empire API"""
@@ -52,8 +49,7 @@ class EmpireAPI(object):
 	    server_url = self.api_base_url + 'admin/login'
 	    creds = {"username": self.username, "password": self.password}
 	    response = self.send_post_request(server_url, json=creds)
-	    token = response['token']
-	    return token
+	    return response['token']
 
 	def get_listeners(self):
 	    """Get the details of current listeners on the server"""
@@ -96,8 +92,6 @@ class Module(CassieXMPPBotModule):
 		self.job_id = None
 		self.job_start_time = datetime.datetime.utcnow()
 		self.job_id = self.bot.job_manager.job_add(self._empire_poll, seconds=self.check_frequency.seconds)
-		self.logger.debug("registered job with id: {0}".format(self.job_id))
-		self.logger.info('hello info')
 
 	def update_options(self, config):
 		if 'room' in config:
@@ -298,12 +292,6 @@ class Module(CassieXMPPBotModule):
 		return report
 
 	def _empire_poll(self, *args):
-		try:
-			self.__empire_poll(*args)
-		except Exception:
-			self.logger.error('polling failed', exc_info=True)
-
-	def __empire_poll(self, *args):
 		"""check each users Empire listener for new agents"""
 		configured_users = []
 		for user in self.bot.authorized_users:
