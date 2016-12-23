@@ -203,7 +203,12 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 			if not guser in self.authorized_users:
 				return
 			user_lvl = self.authorized_users[guser].level
-		arguments = shlex.split(message)
+		try:
+			arguments = shlex.split(message)
+		except ValueError as error:
+			self.logger.warning('failed to split message: ' + message + ' for user ' + jid.bare)
+			self.send_message_formatted(jid, "Cannot parse message because: " + str(error), msg['type'])
+			return
 		command = arguments.pop(0)
 		command = command[1:]
 		if msg['type'] == 'groupchat':
