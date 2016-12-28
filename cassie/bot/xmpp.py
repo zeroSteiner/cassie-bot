@@ -206,8 +206,8 @@ class CassieXMPPBot(sleekxmpp.ClientXMPP):
 		try:
 			arguments = shlex.split(message)
 		except ValueError as error:
-			self.logger.warning('failed to split message: ' + message + ' for user ' + jid.bare)
-			self.send_message_formatted(jid, "Cannot parse message because: " + str(error), msg['type'])
+			self.logger.warning('failed to shlex split message: \'' + message + '\' for user ' + jid.bare)
+			self.send_message_formatted(jid, 'Cannot parse arguments because: ' + str(error), msg['type'])
 			return
 		command = arguments.pop(0)
 		command = command[1:]
