@@ -1,0 +1,23 @@
+logging:
+  file: cassie.log
+  level: info
+  console: true
+
+core:
+  pid_file: /var/run/cassie.pid
+  setuid: 65534
+  users_file: users.dat
+
+modules:
+  - bot_control
+  - cyclic_pattern
+  - sysstat
+  - user_manager
+
+xmpp:
+  jid: cassie@YOURDOMAIN/cassiebot
+  password: SUPERSECRETPASSWORD!!!
+  server:
+    host: SERVER_IP
+    port: SERVER_PORT
+  admin: ADMIN_JID
