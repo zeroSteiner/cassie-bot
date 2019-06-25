@@ -43,6 +43,9 @@ cassie.log
 config.yml
 users.dat
 
+# Pipenv Environment Files
+.venv
+
 # Files that don't need version control
 aimls/*.aiml
 /*.conf

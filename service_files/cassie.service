@@ -8,7 +8,8 @@ After=syslog.target network.target auditd.service
 [Service]
 Type=forking
 PIDFile=/var/run/cassie.pid
-ExecStart=/opt/cassie-bot/cassie.py -L INFO -c /opt/cassie-bot/cassie.conf
+WorkingDirectory=/opt/cassie-bot/
+ExecStart=pipenv run Cassie -L INFO -c /opt/cassie-bot/cassie.conf
 ExecStop=/bin/kill -INT $MAINPID
 
 [Install]
